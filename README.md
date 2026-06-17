@@ -11,6 +11,6 @@ ghostscript
 
 As GUI uses powershell script (see; LIBS\ directory) 
 
-Tested on Windows 10.
+Tested on Windows 10, Windows 11
 
 <img width="1081" height="726" alt="653cf8fe-e95e-4a06-92af-f0cdb27238ba" src="https://github.com/user-attachments/assets/4c0f48ee-d412-4960-adc0-97ae66b96194" />
