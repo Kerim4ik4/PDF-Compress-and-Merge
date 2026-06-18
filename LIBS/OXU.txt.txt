@@ -1,0 +1,1 @@
+Bu direktoriyadan hecne pozulmamalidir. Eks halda proqram ishlemeyecek.

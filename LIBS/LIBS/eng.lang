@@ -1,0 +1,209 @@
+# Kerim's PDF Merger and Compressor - English language file
+# ============================================================
+
+# Main Window
+main_title=Kerim's PDF Merger - QPDF ULTRA FAST
+btn_add_pdfs=Add PDFs
+btn_add_folder=Add Folder
+btn_instant_merge=🚀 INSTANT MERGE
+btn_smart_compress=SMART COMPRESS
+btn_remove=Remove
+btn_clear_all=Clear All
+btn_about=About
+btn_move_up=Move Up
+btn_move_down=Move Down
+btn_ok=OK
+btn_select_language=Select Language:
+
+group_pdf_files=PDF Files (Top to Bottom = Merge Order)
+group_pdf_preview=PDF Preview
+group_settings=Settings
+group_statistics=Statistics
+
+preview_click_file=Click a file to preview
+preview_loading=Loading preview...
+preview_loaded=Preview loaded
+preview_cannot=Cannot preview
+
+chk_compress_after_merge=Compress after merge
+lbl_compression_method=Compression Method:
+lbl_image_quality=Image Quality:
+lbl_pdf_version=PDF Version:
+quality_note=Lower = smaller file, more compression
+
+method_smart_auto=Smart Auto (Recommended - Detects Text/Images)
+method_image_optimized=Image Optimized (Aggressive - 40-50% Quality)
+method_font_subset=Method 1: Ghostscript Font Subset (90%+)
+method_balanced=Balanced (Text + Images)
+method_rebuild=Method 4: Rebuild from Text
+method_maximal=Method 5: Maximal + PDFtk Strip
+
+stats_no_files=No files loaded
+stats_files=Files
+stats_total_size=Total Size
+stats_order=Order
+stats_top_to_bottom=Top to Bottom
+
+status_ready=🚀 QPDF ULTRA FAST - Merges in milliseconds!
+status_added_files=Added
+status_files=files
+status_total=Total
+status_removed=Removed
+status_remaining=Remaining
+status_list_cleared=List cleared
+status_merging=Merging
+status_ultra_fast=ULTRA FAST
+status_compressing=Compressing
+status_merge_compress_complete=Merge + Compression complete
+status_merge_complete=Merge complete
+status_merge_complete_compress_failed=Merge complete, compression failed
+status_merge_failed=Merge failed
+status_analyzing_compressing=Analyzing and compressing...
+status_compression_complete=Compression complete
+status_compression_failed=Compression failed
+status_error=Error
+status_added_dragdrop=Added
+status_files_via_dragdrop=files via drag and drop
+
+filter_pdf=PDF Files
+merged_filename=Merged
+compressed_filename=Compressed
+select_pdf_compress=Select PDF to compress
+
+msg_no_files_selected=No files selected.
+msg_info=Info
+msg_select_files_to_remove=Select files to remove
+msg_clear_all_confirm=Clear all files?
+msg_confirm=Confirm
+msg_min_2_files=Add at least 2 PDF files to merge
+msg_yes=Yes
+msg_no=No
+
+error_title=Error
+success_title=Success
+
+# Tool Search
+searching_tools_in=SEARCHING FOR TOOLS IN: 
+searching_pdftk=Searching for pdftk.exe...
+searching_gs=Searching for Ghostscript...
+searching_qpdf=Searching for qpdf.exe...
+found=Found:
+found_in_path=Found in PATH:
+pdftk_not_found=pdftk.exe NOT FOUND!
+gs_not_found=Ghostscript NOT FOUND!
+qpdf_not_found=qpdf.exe NOT FOUND!
+all_tools_found=✅ ALL TOOLS FOUND!
+tools_missing_title=Tools Missing
+tools_missing_msg=Missing tools: 
+msg_pdftk_required=  - pdftk.exe
+msg_gs_required=  - gswin64c.exe or gswin32c.exe
+msg_qpdf_required=  - qpdf.exe
+msg_subfolders_info=They can be in subfolders - script will find them recursively.
+warning_lang_not_found=Warning: Language file not found at: 
+
+# PDF Analysis
+analyzing_pdf=ANALYZING PDF FILE...
+analyzing_pages=Analyzing pages...
+analyzing_content=Analyzing content...
+pages_found=Pages:
+text_extracted=Text extracted:
+avg_size_per_page=Avg size per page:
+text_per_page=Text per page:
+determining_method=Determining best compression method...
+analysis_complete=ANALYSIS COMPLETE
+analysis_file_size=File size:
+analysis_pages=Pages:
+analysis_text=Text extracted:
+analysis_text_per_page=Text per page:
+analysis_content_type=Content Type:
+analysis_recommended=Recommended:
+analysis_reason=Reason:
+
+content_unknown=Unknown
+content_text_only=Text-Only
+content_image_only=Image-Only / Scanned
+content_mixed=Mixed (Text + Images)
+
+reason_mixed=Both text ($([math]::Round($analysis.TextPerPage,0)) chars/page) and images detected
+reason_text=Text document with $([math]::Round($analysis.TextPerPage,0)) characters per page
+reason_image=Image-based document - will apply aggressive image compression
+reason_text_simple=Text document with minimal formatting
+
+method_image_optimized_name=Image Optimized
+method_font_subset_name=Method 1: Ghostscript Font Subset (90%+)
+method_balanced_name=Balanced (Text + Images)
+method_rebuild_name=Method 4: Rebuild from Text
+method_maximal_name=Method 5: Maximal + PDFtk Strip
+quality=Quality
+method_intelligent=Intelligent
+method_auto=Auto
+
+# Compression
+compressing_with=Compressing with
+compression_complete=COMPRESSION COMPLETE
+compression_method=Method:
+compression_original=Original:
+compression_compressed=Compressed:
+compression_saved=Saved:
+compression_time=Time:
+compression_quality=Image Quality
+compression_analysis=Analysis
+compression_complete_msg=Compression complete!
+compression_complete_title=Compression Complete
+compression_failed_saving_original=Compression failed, saving original
+compression_failed_msg=Compression failed. The original file has been saved.
+file_size_increased=File size increased - using original file.
+
+# Merge
+qpdf_ultra_fast_merge=🚀 QPDF ULTRA FAST MERGE ENGINE
+merge_files_count=Files to merge:
+missing_files=Missing files:
+getting_short_paths=Getting short paths...
+qpdf_command=🚀 QPDF COMMAND (INSTANT!)
+qpdf_error=QPDF ERROR:
+qpdf_output=QPDF OUTPUT:
+success_time_size=✅ Success! Time: ${elapsed}s, Size: $size MB
+qpdf_failed_fallback=QPDF failed, trying PDFtk fallback...
+pdftk_fallback_success=✅ PDFtk fallback success! Time: ${elapsed}s, Size: $size MB
+merge_failed=Merge failed! Exit code: 
+no_files_to_merge=No files to merge
+merge_failed_msg=Merge failed! Check console for details.
+error_during_merge=Error during merge:
+error_during_compression=Error during compression:
+
+# Working Dialog
+working_title=Please Wait
+working_please_wait=Working... Please Wait...
+working_analyzing=Analyzing...
+working_compressing=Compressing...
+working_merging=Merging...
+working_compressing_result=Compressing result...
+working_merging_qpdf=Merging via QPDF...
+working_merging_pdftk=Merging via PDFtk...
+working_analyzing_compressing=Analyzing & compressing...
+
+# Merge Complete Messages
+merge_complete=🚀 Merge complete!
+merge_compress_complete=🚀 Merge + Compression complete!
+files_merged=Files merged:
+size=Size:
+time=Time:
+
+# Context Menu
+context_remove_selected=Remove Selected
+context_clear_all=Clear All
+
+# About Dialog
+about_title=About Kerim's PDF Merger
+about_text=🚀 QPDF ULTRA FAST EDITION 🚀
+
+Merges PDFs in milliseconds!
+
+- Uses QPDF for instant merging
+- Unicode filename support
+- Ghostscript compression
+- Recursive tool search
+- Popup progress dialog (animated)
+
+Coded By Tural!
+2026

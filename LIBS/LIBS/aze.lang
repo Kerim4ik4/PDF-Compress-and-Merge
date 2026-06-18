@@ -1,0 +1,208 @@
+# Kerim's PDF Merger and Compressor - Azərbaycan dili faylı
+# ============================================================
+
+# Main Window
+main_title=Kerim-in PDF Birləşdiricisi - QPDF ULTRA SÜRƏTLİ
+btn_add_pdfs=PDF-lər əlavə et
+btn_add_folder=Qovluq əlavə et
+btn_instant_merge=🚀 ANİ BİRLƏŞDİR
+btn_smart_compress=AĞILLI SIXIŞDIR
+btn_remove=Sil
+btn_clear_all=Hamısını təmizlə
+btn_about=Haqqında
+btn_move_up=Yuxarı apar
+btn_move_down=Aşağı apar
+btn_ok=OK
+
+group_pdf_files=PDF faylları (Yuxarıdan Aşağıya = Birləşmə Sırası)
+group_pdf_preview=PDF baxışı
+group_settings=Parametrlər
+group_statistics=Statistika
+
+preview_click_file=Baxış üçün faylı seçin
+preview_loading=Baxış yüklənir...
+preview_loaded=Baxış yükləndi
+preview_cannot=Baxış mümkün deyil
+
+chk_compress_after_merge=Birləşmədən sonra sıxışdır
+lbl_compression_method=Sıxışdırma metodu:
+lbl_image_quality=Şəkil keyfiyyəti:
+lbl_pdf_version=PDF versiyası:
+quality_note=Aşağı = kiçik fayl, daha çox sıxışdırma
+
+method_smart_auto=Ağıllı Avtomatik (Tövsiyə olunur - Mətn/Şəkilləri aşkarlayır)
+method_image_optimized=Şəkil Optimallaşdırılmış (Aqressiv - 40-50% Keyfiyyət)
+method_font_subset=Metod 1: Ghostscript Şrift Altçoxluğu (90%+)
+method_balanced=Balanslı (Mətn + Şəkillər)
+method_rebuild=Metod 4: Mətndən Yenidən Qurma
+method_maximal=Metod 5: Maksimal + PDFtk Təmizləmə
+
+stats_no_files=Heç bir fayl yüklənməyib
+stats_files=Fayl sayı
+stats_total_size=Ümumi ölçü
+stats_order=Sıra
+stats_top_to_bottom=Yuxarıdan Aşağıya
+
+status_ready=🚀 QPDF ULTRA SÜRƏTLİ - Millisaniyələrlə birləşdirir!
+status_added_files=Əlavə edildi
+status_files=fayl
+status_total=Ümumi
+status_removed=Silindi
+status_remaining=Qalan
+status_list_cleared=Siyahı təmizləndi
+status_merging=Birləşdirilir
+status_ultra_fast=ULTRA SÜRƏTLİ
+status_compressing=Sıxışdırılır
+status_merge_compress_complete=Birləşmə + Sıxışdırma tamamlandı
+status_merge_complete=Birləşmə tamamlandı
+status_merge_complete_compress_failed=Birləşmə tamamlandı, sıxışdırma uğursuz oldu
+status_merge_failed=Birləşmə uğursuz oldu
+status_analyzing_compressing=Təhlil edilir və sıxışdırılır...
+status_compression_complete=Sıxışdırma tamamlandı
+status_compression_failed=Sıxışdırma uğursuz oldu
+status_error=Xəta
+status_added_dragdrop=Əlavə edildi
+status_files_via_dragdrop=sürüşdürüb-buraxma ilə fayl
+
+filter_pdf=PDF faylları
+merged_filename=Birləşdirilmiş
+compressed_filename=Sıxışdırılmış
+select_pdf_compress=Sıxışdırmaq üçün PDF seçin
+
+msg_no_files_selected=Heç bir fayl seçilməyib.
+msg_info=Məlumat
+msg_select_files_to_remove=Silinəcək faylları seçin
+msg_clear_all_confirm=Bütün faylları təmizləmək istəyirsiniz?
+msg_confirm=Təsdiqlə
+msg_min_2_files=Birləşdirmək üçün ən azı 2 PDF faylı əlavə edin
+msg_yes=Bəli
+msg_no=Xeyr
+
+error_title=Xəta
+success_title=Uğurlu
+
+# Tool Search
+searching_tools_in=ALƏTLƏR AXTARILIR: 
+searching_pdftk=pdftk.exe axtarılır...
+searching_gs=Ghostscript axtarılır...
+searching_qpdf=qpdf.exe axtarılır...
+found=Tapıldı:
+found_in_path=PATH-də tapıldı:
+pdftk_not_found=pdftk.exe TAPILMADI!
+gs_not_found=Ghostscript TAPILMADI!
+qpdf_not_found=qpdf.exe TAPILMADI!
+all_tools_found=✅ BÜTÜN ALƏTLƏR TAPILDI!
+tools_missing_title=Alətlər tapılmadı
+tools_missing_msg=Alətlər tapılmadı: 
+msg_pdftk_required=  - pdftk.exe
+msg_gs_required=  - gswin64c.exe və ya gswin32c.exe
+msg_qpdf_required=  - qpdf.exe
+msg_subfolders_info=Alt qovluqlarda ola bilər - skript onları rekursiv şəkildə tapacaq.
+warning_lang_not_found=Xəbərdarlıq: Dil faylı tapılmadı: 
+
+# PDF Analysis
+analyzing_pdf=PDF FAYLI TƏHLİL EDİLİR...
+analyzing_pages=Səhifələr təhlil edilir...
+analyzing_content=Məzmun təhlil edilir...
+pages_found=Səhifələr:
+text_extracted=Mətn çıxarıldı:
+avg_size_per_page=Səhifə başına orta ölçü:
+text_per_page=Səhifə başına mətn:
+determining_method=Ən yaxşı sıxışdırma metodu müəyyən edilir...
+analysis_complete=TƏHLİL TAMAMLANDI
+analysis_file_size=Fayl ölçüsü:
+analysis_pages=Səhifələr:
+analysis_text=Mətn çıxarıldı:
+analysis_text_per_page=Səhifə başına mətn:
+analysis_content_type=Məzmun tipi:
+analysis_recommended=Tövsiyə olunur:
+analysis_reason=Səbəb:
+
+content_unknown=Bilinməyən
+content_text_only=Mətn-Only
+content_image_only=Şəkil-Only / Skan edilmiş
+content_mixed=Qarışıq (Mətn + Şəkillər)
+
+reason_mixed=Həm mətn ($([math]::Round($analysis.TextPerPage,0)) simvol/səhifə), həm də şəkillər aşkarlandı
+reason_text=Mətn sənədi - $([math]::Round($analysis.TextPerPage,0)) simvol/səhifə
+reason_image=Şəkil əsaslı sənəd - aqressiv şəkil sıxışdırması tətbiq olunacaq
+reason_text_simple=Minimal formatlaşdırma ilə mətn sənədi
+
+method_image_optimized_name=Şəkil Optimallaşdırılmış
+method_font_subset_name=Metod 1: Ghostscript Şrift Altçoxluğu (90%+)
+method_balanced_name=Balanslı (Mətn + Şəkillər)
+method_rebuild_name=Metod 4: Mətndən Yenidən Qurma
+method_maximal_name=Metod 5: Maksimal + PDFtk Təmizləmə
+quality=Keyfiyyət
+method_intelligent=Ağıllı
+method_auto=Avtomatik
+
+# Compression
+compressing_with=Sıxışdırılır:
+compression_complete=SIXIŞDIRMA TAMAMLANDI
+compression_method=Metod:
+compression_original=Orijinal:
+compression_compressed=Sıxışdırılmış:
+compression_saved=Qənaət edildi:
+compression_time=Vaxt:
+compression_quality=Şəkil keyfiyyəti
+compression_analysis=Təhlil
+compression_complete_msg=Sıxışdırma tamamlandı!
+compression_complete_title=Sıxışdırma Tamamlandı
+compression_failed_saving_original=Sıxışdırma uğursuz oldu, orijinal fayl saxlanılır
+compression_failed_msg=Sıxışdırma uğursuz oldu. Orijinal fayl yadda saxlanıldı.
+file_size_increased=Fayl ölçüsü artdı - orijinal fayl istifadə olunur.
+
+# Merge
+qpdf_ultra_fast_merge=🚀 QPDF ULTRA SÜRƏTLİ BİRLƏŞMƏ MÜHƏRRİKİ
+merge_files_count=Birləşdiriləcək fayllar:
+missing_files=Çatışmayan fayllar:
+getting_short_paths=Qısa yollar alınır...
+qpdf_command=🚀 QPDF ƏMRİ (ANİ!)
+qpdf_error=QPDF XƏTASI:
+qpdf_output=QPDF ÇIXIŞI:
+success_time_size=✅ Uğurlu! Vaxt: ${elapsed}s, Ölçü: $size MB
+qpdf_failed_fallback=QPDF uğursuz oldu, PDFtk ehtiyat seçimi sınaqdan keçirilir...
+pdftk_fallback_success=✅ PDFtk ehtiyat seçimi uğurlu! Vaxt: ${elapsed}s, Ölçü: $size MB
+merge_failed=Birləşmə uğursuz oldu! Çıxış kodu: 
+no_files_to_merge=Birləşdirmək üçün fayl yoxdur
+merge_failed_msg=Birləşmə uğursuz oldu! Ətraflı məlumat üçün konsolu yoxlayın.
+error_during_merge=Birləşmə zamanı xəta:
+error_during_compression=Sıxışdırma zamanı xəta:
+
+# Working Dialog
+working_title=Xahiş edirik gözləyin
+working_please_wait=İşlənir... Zəhmət olmasa gözləyin...
+working_analyzing=Təhlil edilir...
+working_compressing=Sıxışdırılır...
+working_merging=Birləşdirilir...
+working_compressing_result=Sıxışdırılır...
+working_merging_qpdf=Birləşdirilir (QPDF ilə)...
+working_merging_pdftk=Birləşdirilir (PDFtk ilə)...
+working_analyzing_compressing=Təhlil edilir və sıxışdırılır...
+
+# Merge Complete Messages
+merge_complete=🚀 Birləşmə tamamlandı!
+merge_compress_complete=🚀 Birləşmə + Sıxışdırma tamamlandı!
+files_merged=Birləşdirilən fayllar:
+size=Ölçü:
+time=Vaxt:
+
+# Context Menu
+context_remove_selected=Seçilmişləri sil
+context_clear_all=Hamısını təmizlə
+
+# About Dialog
+about_title=Kerim-in PDF Birləşdiricisi Haqqında
+about_text=🚀 QPDF ULTRA SÜRƏTLİ NƏŞR 🚀
+
+Millisaniyələrlə PDF-ləri birləşdirir!
+
+- Ani birləşmə üçün QPDF istifadə edir
+- Unicode fayl adları dəstəyi
+- Ghostscript sıxışdırması
+- Rekursiv alət axtarışı
+- Açılan pəncərə ilə işləmə prosesi (animasiyalı)
+
+Tural tərəfindən kodlaşdırılıb!
+2026
