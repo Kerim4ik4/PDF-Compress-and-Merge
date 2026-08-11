@@ -786,9 +786,7 @@ $btnAbout.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.
 $btnAbout.FlatStyle = "Flat"
 $buttonBar.Controls.Add($btnAbout)
 
-$form.Controls.Add($buttonBar)
-
-# ============= LEFT PANEL - FILE LIST =============
+$form.Controls.Add($buttonBar)# ============= LEFT PANEL - FILE LIST =============
 $leftGroup = New-Object System.Windows.Forms.GroupBox
 $leftGroup.Text = "PDF Files (Top to Bottom = Merge Order)"
 $leftGroup.Location = New-Object System.Drawing.Point(12, 65)
@@ -803,57 +801,199 @@ $listBox.SelectionMode = "MultiExtended"
 # ============= LISTBOX SCROLLABLE (HORIZONTAL + VERTICAL) =============
 $listBox.ScrollAlwaysVisible = $true
 $listBox.HorizontalScrollbar = $true
+$listBox.AllowDrop = $true
 $leftGroup.Controls.Add($listBox)
 
-# ============= CONTEXT MENU WITH OPEN OPTION =============
+# ============= HELPER LOGIC FOR ADDING FILES (WITH BOM & STRIP FIX) =============
+$AddFilesToList = {
+    param($filePaths)
+    $addedAny = $false
+    foreach ($p in $filePaths) {
+        if ([string]::IsNullOrWhiteSpace($p)) { continue }
+        
+        # Strip UTF-8 BOM, non-printable unicode control characters, quotes, and whitespace
+        $cleanPath = [regex]::Replace($p, '[^\x20-\x7E]', '').Trim().Trim('"').Trim("'")
+        
+        # Fallback if regex was too strict for accented/utf8 characters:
+        if ($cleanPath -eq "" -and $p.Trim() -ne "") {
+            $cleanPath = $p.Trim().Trim('"').Trim("'").Trim([char]0xFEFF)
+        }
+
+        if ($cleanPath -ne "" -and (Test-Path -LiteralPath $cleanPath)) {
+            if (-not $listBox.Items.Contains($cleanPath)) {
+                [void]$listBox.Items.Add($cleanPath)
+                $addedAny = $true
+            }
+        }
+    }
+    if ($addedAny -and (Get-Command "UpdateStats" -ErrorAction SilentlyContinue)) {
+        UpdateStats
+    }
+}
+
+# ============= DRAG & DROP EVENTS =============
+$listBox.Add_DragEnter({
+    param($sender, $e)
+    if ($e.Data.GetDataPresent([System.Windows.Forms.DataFormats]::FileDrop)) {
+        $e.Effect = [System.Windows.Forms.DragDropEffects]::Copy
+    } else {
+        $e.Effect = [System.Windows.Forms.DragDropEffects]::None
+    }
+})
+
+$listBox.Add_DragDrop({
+    param($sender, $e)
+    if ($e.Data.GetDataPresent([System.Windows.Forms.DataFormats]::FileDrop)) {
+        $droppedFiles = $e.Data.GetData([System.Windows.Forms.DataFormats]::FileDrop)
+        & $AddFilesToList $droppedFiles
+    }
+})
+
+# ============= KEYBOARD SHORTCUTS (CTRL+V, CTRL+C, DELETE) =============
+$listBox.Add_KeyDown({
+    param($sender, $e)
+    
+    # CTRL + V (Paste Text / Files)
+    if ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::V) {
+        if ([System.Windows.Forms.Clipboard]::ContainsFileDropList()) {
+            $files = [System.Windows.Forms.Clipboard]::GetFileDropList()
+            & $AddFilesToList $files
+        } elseif ([System.Windows.Forms.Clipboard]::ContainsText()) {
+            $text = [System.Windows.Forms.Clipboard]::GetText()
+            $lines = $text -split "`r`n|`n"
+            & $AddFilesToList $lines
+        }
+    }
+    
+    # CTRL + C (Copy Selected)
+    elseif ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::C) {
+        if ($listBox.SelectedItems.Count -gt 0) {
+            $copiedText = ($listBox.SelectedItems -join [Environment]::NewLine)
+            [System.Windows.Forms.Clipboard]::SetText($copiedText)
+        }
+    }
+    
+    # DELETE KEY
+    elseif ($e.KeyCode -eq [System.Windows.Forms.Keys]::Delete) {
+        if ($listBox.SelectedIndices.Count -gt 0) {
+            $indices = @($listBox.SelectedIndices)
+            foreach ($idx in ($indices | Sort-Object -Descending)) {
+                $listBox.Items.RemoveAt($idx)
+            }
+            if (Get-Command "UpdateStats" -ErrorAction SilentlyContinue) { UpdateStats }
+        }
+    }
+})
+
+# ============= CONTEXT MENU =============
 $contextMenu = New-Object System.Windows.Forms.ContextMenuStrip
 
+# 1. Open
 $openFileItem = New-Object System.Windows.Forms.ToolStripMenuItem
 $openFileItem.Text = "Open"
 $openFileItem.Add_Click({
     if ($listBox.SelectedIndex -ge 0) {
         $filePath = $listBox.SelectedItem.ToString()
-        if (Test-Path $filePath) {
+        if (Test-Path -LiteralPath $filePath) {
             try {
                 Start-Process $filePath
             } catch {
-                [System.Windows.Forms.MessageBox]::Show("Cannot open file: $($_.Exception.Message)", "Error", "OK", "Error")
+                [void][System.Windows.Forms.MessageBox]::Show("Cannot open file: $($_.Exception.Message)", "Error", "OK", "Error")
             }
         } else {
-            [System.Windows.Forms.MessageBox]::Show("File not found: $filePath", "Error", "OK", "Error")
+            [void][System.Windows.Forms.MessageBox]::Show("File not found: $filePath", "Error", "OK", "Error")
         }
     } else {
-        [System.Windows.Forms.MessageBox]::Show("No file selected.", "Info", "OK", "Information")
+        [void][System.Windows.Forms.MessageBox]::Show("No file selected.", "Info", "OK", "Information")
     }
 })
-$contextMenu.Items.Add($openFileItem)
-$contextMenu.Items.Add("-")
+[void]$contextMenu.Items.Add($openFileItem)
+[void]$contextMenu.Items.Add("-")
 
+# 2. Paste
+$pasteItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$pasteItem.Text = "Paste Files / Paths (Ctrl+V)"
+$pasteItem.Add_Click({
+    if ([System.Windows.Forms.Clipboard]::ContainsFileDropList()) {
+        $files = [System.Windows.Forms.Clipboard]::GetFileDropList()
+        & $AddFilesToList $files
+    } elseif ([System.Windows.Forms.Clipboard]::ContainsText()) {
+        $text = [System.Windows.Forms.Clipboard]::GetText()
+        $lines = $text -split "`r`n|`n"
+        & $AddFilesToList $lines
+    }
+})
+[void]$contextMenu.Items.Add($pasteItem)
+
+# 3. Copy
+$copyItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$copyItem.Text = "Copy Selected Paths (Ctrl+C)"
+$copyItem.Add_Click({
+    if ($listBox.SelectedItems.Count -gt 0) {
+        $copiedText = ($listBox.SelectedItems -join [Environment]::NewLine)
+        [System.Windows.Forms.Clipboard]::SetText($copiedText)
+    }
+})
+[void]$contextMenu.Items.Add($copyItem)
+[void]$contextMenu.Items.Add("-")
+
+# 4. Import TXT File
+$importTxtItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$importTxtItem.Text = "Import List from TXT File..."
+$importTxtItem.Add_Click({
+    $ofd = New-Object System.Windows.Forms.OpenFileDialog
+    $ofd.Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*"
+    if ($ofd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        $lines = Get-Content -LiteralPath $ofd.FileName
+        & $AddFilesToList $lines
+    }
+})
+[void]$contextMenu.Items.Add($importTxtItem)
+
+# 5. Export TXT File
+$exportTxtItem = New-Object System.Windows.Forms.ToolStripMenuItem
+$exportTxtItem.Text = "Export List to TXT File..."
+$exportTxtItem.Add_Click({
+    if ($listBox.Items.Count -eq 0) { return }
+    $sfd = New-Object System.Windows.Forms.SaveFileDialog
+    $sfd.Filter = "Text Files (*.txt)|*.txt"
+    $sfd.FileName = "pdf_file_list.txt"
+    if ($sfd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+        $listBox.Items | Out-File -FilePath $sfd.FileName -Encoding utf8
+    }
+})
+[void]$contextMenu.Items.Add($exportTxtItem)
+[void]$contextMenu.Items.Add("-")
+
+# 6. Remove Selected
 $removeSelectedItem = New-Object System.Windows.Forms.ToolStripMenuItem
 $removeSelectedItem.Text = "Remove Selected"
 $removeSelectedItem.Add_Click({
     if ($listBox.SelectedIndices.Count -eq 0) { 
-        [System.Windows.Forms.MessageBox]::Show("No files selected.", "Info", "OK", "Information") | Out-Null
+        [void][System.Windows.Forms.MessageBox]::Show("No files selected.", "Info", "OK", "Information")
         return 
     }
     $indices = @()
     foreach ($idx in $listBox.SelectedIndices) { $indices += $idx }
     foreach ($idx in ($indices | Sort-Object -Descending)) { $listBox.Items.RemoveAt($idx) }
-    UpdateStats
+    if (Get-Command "UpdateStats" -ErrorAction SilentlyContinue) { UpdateStats }
 })
-$contextMenu.Items.Add($removeSelectedItem)
+[void]$contextMenu.Items.Add($removeSelectedItem)
 
+# 7. Clear All
 $removeAllItem = New-Object System.Windows.Forms.ToolStripMenuItem
 $removeAllItem.Text = "Clear All"
 $removeAllItem.Add_Click({
     if ($listBox.Items.Count -gt 0 -and [System.Windows.Forms.MessageBox]::Show("Clear all files?", "Confirm", "YesNo", "Question") -eq "Yes") {
         $listBox.Items.Clear()
-        UpdateStats
+        if (Get-Command "UpdateStats" -ErrorAction SilentlyContinue) { UpdateStats }
     }
 })
-$contextMenu.Items.Add($removeAllItem)
+[void]$contextMenu.Items.Add($removeAllItem)
+
 $listBox.ContextMenuStrip = $contextMenu
 
+# ============= BUTTONS =============
 $moveUp = New-Object System.Windows.Forms.Button
 $moveUp.Text = "Move Up"
 $moveUp.Location = New-Object System.Drawing.Point(10, 590)
@@ -873,6 +1013,7 @@ $moveDown.FlatStyle = "Flat"
 $leftGroup.Controls.Add($moveDown)
 
 $form.Controls.Add($leftGroup)
+
 
 # ============= RIGHT PANEL - PREVIEW =============
 $rightGroup = New-Object System.Windows.Forms.GroupBox
