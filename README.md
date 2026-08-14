@@ -9,6 +9,16 @@
 
 ---
 
+<img width="1063" height="752" alt="image" src="https://github.com/user-attachments/assets/3cc21681-bdd6-4fb9-a06c-c89e9d9f4052" />
+
+
+<img width="1224" height="653" alt="image" src="https://github.com/user-attachments/assets/031e792c-fa1b-46f9-977b-caffd5e8becb" />
+
+<img width="1063" height="752" alt="image" src="https://github.com/user-attachments/assets/966a5cdc-dfbd-49ed-b997-def997ec294b" />
+
+<img width="1086" height="768" alt="image" src="https://github.com/user-attachments/assets/bc058f81-238a-466b-bf74-2e8613a8b133" />
+
+
 ## 📋 Table of Contents
 
 - [Quick Start](#-quick-start)
@@ -362,3 +372,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 *Tested on Windows 10, Windows 11*
+
+**Full Changelog**: https://github.com/Kerim4ik4/PDF-Compress-and-Merge/compare/v3...v4
+
+**Full Changelog**: https://github.com/Kerim4ik4/PDF-Compress-and-Merge/compare/v3...v4
