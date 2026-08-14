@@ -1,5 +1,5 @@
 # ============================================================
-# Kerim's PDF Merger and Compressor - QPDF ULTRA FAST EDITION
+# Kerim's PDF Merger, Splitter and Compressor - QPDF ULTRA FAST EDITION
 # Recursively finds all tools in LIBS folder
 # Adds popup "Working... Please Wait..." dialog with animation
 # (No BackgroundWorker / No runspace errors)
@@ -152,6 +152,86 @@ function Find-QPDF {
     try { $p = (Get-Command qpdf.exe -ErrorAction SilentlyContinue); if ($p) { Write-Host "    Found in PATH: $($p.Source)" -ForegroundColor Green; return $p.Source } } catch { }
     Write-Host "    qpdf.exe NOT FOUND!" -ForegroundColor Red
     return $null
+}
+
+function Split_ParsePageRanges {
+    param([string]$pageRangeSpec)
+    
+    $input=$pageRangeSpec
+    
+    Write-Host "DEBUG: ParsePageRanges received: '$pageRangeSpec'" -ForegroundColor Cyan
+    Write-Host "DEBUG: Input length: $($pageRangeSpec.Length)" -ForegroundColor Cyan
+    
+    $ranges = @()
+    
+    if ([string]::IsNullOrWhiteSpace($pageRangeSpec)) {
+        Write-Host "DEBUG: Input is empty or null" -ForegroundColor Yellow
+        return $ranges
+    }
+    
+    $input = $input.Trim()
+    Write-Host "DEBUG: Trimmed input: '$input'" -ForegroundColor Cyan
+    
+    $parts = $input -split "[,;|]"
+    Write-Host "DEBUG: Split into $($parts.Count) parts" -ForegroundColor Cyan
+    
+    foreach ($part in $parts) {
+        $part = $part.Trim()
+        Write-Host "DEBUG: Processing part: '$part'" -ForegroundColor Gray
+        if ([string]::IsNullOrWhiteSpace($part)) { 
+            Write-Host "DEBUG: Part is empty, skipping" -ForegroundColor Gray
+            continue 
+        }
+        
+        if ($part -match "^(\d+)\s*-\s*(\d+)$") {
+            $start = [int]$matches[1]
+            $end = [int]$matches[2]
+            Write-Host "DEBUG: Found range: $start-$end" -ForegroundColor Green
+            if ($start -le $end) {
+                $ranges += @{ Start = $start; End = $end }
+            } else {
+                $ranges += @{ Start = $end; End = $start }
+            }
+        }
+        elseif ($part -match "^(\d+)$") {
+            $page = [int]$matches[1]
+            Write-Host "DEBUG: Found single page: $page" -ForegroundColor Green
+            $ranges += @{ Start = $page; End = $page }
+        }
+        else {
+            Write-Host "DEBUG: Part '$part' did not match any pattern" -ForegroundColor Red
+        }
+    }
+    
+    if ($ranges.Count -eq 0) {
+        Write-Host "DEBUG: No ranges found with splitting, trying fallback" -ForegroundColor Yellow
+        $fallbackInput = $input -replace "\s+", ""
+        Write-Host "DEBUG: Fallback input: '$fallbackInput'" -ForegroundColor Cyan
+        
+        if ($fallbackInput -match "^(\d+)-(\d+)$") {
+            $start = [int]$matches[1]
+            $end = [int]$matches[2]
+            Write-Host "DEBUG: Fallback found range: $start-$end" -ForegroundColor Green
+            if ($start -le $end) {
+                $ranges += @{ Start = $start; End = $end }
+            } else {
+                $ranges += @{ Start = $end; End = $start }
+            }
+        } elseif ($fallbackInput -match "^(\d+)$") {
+            $page = [int]$matches[1]
+            Write-Host "DEBUG: Fallback found single page: $page" -ForegroundColor Green
+            $ranges += @{ Start = $page; End = $page }
+        } else {
+            Write-Host "DEBUG: Fallback failed to match any pattern" -ForegroundColor Red
+        }
+    }
+    
+    Write-Host "DEBUG: Final ranges: $($ranges.Count) found" -ForegroundColor Cyan
+    foreach ($r in $ranges) {
+        Write-Host "DEBUG:   Range: $($r.Start)-$($r.End)" -ForegroundColor Gray
+    }
+    
+    return $ranges
 }
 
 # ============= FIND TOOLS =============
@@ -539,7 +619,11 @@ function CompressMethod5_MaximalPlusStrip {
     return $false
 }
 
-# ============= SMART COMPRESSION ENGINE (UI-thread, popup) =============
+# ============= SMART COMPRESSION ENGINE =============
+$script:cmbMethod = $null
+$script:cmbVersion = $null
+$script:trackQuality = $null
+
 function CompressFileSmart {
     param($inputFile, $outputFile)
     if (-not (Test-Path $inputFile)) { return $false }
@@ -553,9 +637,9 @@ function CompressFileSmart {
     
     $inputSize = $analysis.FileSize
     $inputMB   = $analysis.FileSizeMB
-    $version   = $cmbVersion.SelectedItem.ToString()
-    $selectedMethod = $cmbMethod.SelectedItem.ToString()
-    $imageQuality   = [int]$trackQuality.Value
+    $version   = $script:cmbVersion.SelectedItem.ToString()
+    $selectedMethod = $script:cmbMethod.SelectedItem.ToString()
+    $imageQuality   = [int]$script:trackQuality.Value
     
     $useMethodName = ""
     $useFunction = $null
@@ -629,7 +713,7 @@ function CompressFileSmart {
     return $false
 }
 
-# ============= ULTRA FAST QPDF MERGE (UI-thread, popup) =============
+# ============= ULTRA FAST QPDF MERGE =============
 function MergeFiles {
     param($files, $output)
     if ($files.Count -eq 0) { Write-Host "No files to merge" -ForegroundColor Red; return $false }
@@ -702,482 +786,17 @@ function MergeFiles {
     return $false
 }
 
-# ============= CREATE MAIN FORM =============
-$form = New-Object System.Windows.Forms.Form
-$form.Text = "Kerim's PDF Merger - QPDF ULTRA FAST"
-$form.Size = New-Object System.Drawing.Size(1100, 780)
-$form.StartPosition = "CenterScreen"
-$form.BackColor = [System.Drawing.Color]::FromArgb(240, 242, 245)
-
-# ============= TOP BUTTON BAR =============
-$buttonBar = New-Object System.Windows.Forms.Panel
-$buttonBar.Dock = "Top"
-$buttonBar.Height = 55
-$buttonBar.BackColor = [System.Drawing.Color]::FromArgb(52, 73, 94)
-
-$btnAdd = New-Object System.Windows.Forms.Button
-$btnAdd.Text = "Add PDFs"
-$btnAdd.Location = New-Object System.Drawing.Point(10, 10)
-$btnAdd.Size = New-Object System.Drawing.Size(100, 40)
-$btnAdd.BackColor = [System.Drawing.Color]::FromArgb(46, 204, 113)
-$btnAdd.ForeColor = [System.Drawing.Color]::White
-$btnAdd.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$btnAdd.FlatStyle = "Flat"
-$buttonBar.Controls.Add($btnAdd)
-
-$btnAddFolder = New-Object System.Windows.Forms.Button
-$btnAddFolder.Text = "Add Folder"
-$btnAddFolder.Location = New-Object System.Drawing.Point(120, 10)
-$btnAddFolder.Size = New-Object System.Drawing.Size(100, 40)
-$btnAddFolder.BackColor = [System.Drawing.Color]::FromArgb(52, 152, 219)
-$btnAddFolder.ForeColor = [System.Drawing.Color]::White
-$btnAddFolder.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$btnAddFolder.FlatStyle = "Flat"
-$buttonBar.Controls.Add($btnAddFolder)
-
-$btnMerge = New-Object System.Windows.Forms.Button
-$btnMerge.Text = "INSTANT MERGE"
-$btnMerge.Location = New-Object System.Drawing.Point(230, 10)
-$btnMerge.Size = New-Object System.Drawing.Size(140, 40)
-$btnMerge.BackColor = [System.Drawing.Color]::FromArgb(155, 89, 182)
-$btnMerge.ForeColor = [System.Drawing.Color]::White
-$btnMerge.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$btnMerge.FlatStyle = "Flat"
-$btnMerge.Enabled = $false
-$buttonBar.Controls.Add($btnMerge)
-
-$btnCompress = New-Object System.Windows.Forms.Button
-$btnCompress.Text = "SMART COMPRESS"
-$btnCompress.Location = New-Object System.Drawing.Point(380, 10)
-$btnCompress.Size = New-Object System.Drawing.Size(180, 40)
-$btnCompress.BackColor = [System.Drawing.Color]::FromArgb(230, 126, 34)
-$btnCompress.ForeColor = [System.Drawing.Color]::White
-$btnCompress.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$btnCompress.FlatStyle = "Flat"
-$buttonBar.Controls.Add($btnCompress)
-
-$btnRemove = New-Object System.Windows.Forms.Button
-$btnRemove.Text = "Remove"
-$btnRemove.Location = New-Object System.Drawing.Point(570, 10)
-$btnRemove.Size = New-Object System.Drawing.Size(100, 40)
-$btnRemove.BackColor = [System.Drawing.Color]::FromArgb(231, 76, 60)
-$btnRemove.ForeColor = [System.Drawing.Color]::White
-$btnRemove.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$btnRemove.FlatStyle = "Flat"
-$buttonBar.Controls.Add($btnRemove)
-
-$btnClear = New-Object System.Windows.Forms.Button
-$btnClear.Text = "Clear All"
-$btnClear.Location = New-Object System.Drawing.Point(680, 10)
-$btnClear.Size = New-Object System.Drawing.Size(100, 40)
-$btnClear.BackColor = [System.Drawing.Color]::FromArgb(149, 165, 166)
-$btnClear.ForeColor = [System.Drawing.Color]::White
-$btnClear.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$btnClear.FlatStyle = "Flat"
-$buttonBar.Controls.Add($btnClear)
-
-$btnAbout = New-Object System.Windows.Forms.Button
-$btnAbout.Text = "About"
-$btnAbout.Location = New-Object System.Drawing.Point(790, 10)
-$btnAbout.Size = New-Object System.Drawing.Size(100, 40)
-$btnAbout.BackColor = [System.Drawing.Color]::FromArgb(241, 196, 15)
-$btnAbout.ForeColor = [System.Drawing.Color]::White
-$btnAbout.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
-$btnAbout.FlatStyle = "Flat"
-$buttonBar.Controls.Add($btnAbout)
-
-$form.Controls.Add($buttonBar)# ============= LEFT PANEL - FILE LIST =============
-$leftGroup = New-Object System.Windows.Forms.GroupBox
-$leftGroup.Text = "PDF Files (Top to Bottom = Merge Order)"
-$leftGroup.Location = New-Object System.Drawing.Point(12, 65)
-$leftGroup.Size = New-Object System.Drawing.Size(500, 630)
-$leftGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
-
-$listBox = New-Object System.Windows.Forms.ListBox
-$listBox.Location = New-Object System.Drawing.Point(10, 25)
-$listBox.Size = New-Object System.Drawing.Size(480, 560)
-$listBox.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-$listBox.SelectionMode = "MultiExtended"
-# ============= LISTBOX SCROLLABLE (HORIZONTAL + VERTICAL) =============
-$listBox.ScrollAlwaysVisible = $true
-$listBox.HorizontalScrollbar = $true
-$listBox.AllowDrop = $true
-$leftGroup.Controls.Add($listBox)
-
-# ============= HELPER LOGIC FOR ADDING FILES (WITH BOM & STRIP FIX) =============
-$AddFilesToList = {
-    param($filePaths)
-    $addedAny = $false
-    foreach ($p in $filePaths) {
-        if ([string]::IsNullOrWhiteSpace($p)) { continue }
-        
-        # Strip UTF-8 BOM, non-printable unicode control characters, quotes, and whitespace
-        $cleanPath = [regex]::Replace($p, '[^\x20-\x7E]', '').Trim().Trim('"').Trim("'")
-        
-        # Fallback if regex was too strict for accented/utf8 characters:
-        if ($cleanPath -eq "" -and $p.Trim() -ne "") {
-            $cleanPath = $p.Trim().Trim('"').Trim("'").Trim([char]0xFEFF)
-        }
-
-        if ($cleanPath -ne "" -and (Test-Path -LiteralPath $cleanPath)) {
-            if (-not $listBox.Items.Contains($cleanPath)) {
-                [void]$listBox.Items.Add($cleanPath)
-                $addedAny = $true
-            }
-        }
-    }
-    if ($addedAny -and (Get-Command "UpdateStats" -ErrorAction SilentlyContinue)) {
-        UpdateStats
-    }
-}
-
-# ============= DRAG & DROP EVENTS =============
-$listBox.Add_DragEnter({
-    param($sender, $e)
-    if ($e.Data.GetDataPresent([System.Windows.Forms.DataFormats]::FileDrop)) {
-        $e.Effect = [System.Windows.Forms.DragDropEffects]::Copy
-    } else {
-        $e.Effect = [System.Windows.Forms.DragDropEffects]::None
-    }
-})
-
-$listBox.Add_DragDrop({
-    param($sender, $e)
-    if ($e.Data.GetDataPresent([System.Windows.Forms.DataFormats]::FileDrop)) {
-        $droppedFiles = $e.Data.GetData([System.Windows.Forms.DataFormats]::FileDrop)
-        & $AddFilesToList $droppedFiles
-    }
-})
-
-# ============= KEYBOARD SHORTCUTS (CTRL+V, CTRL+C, DELETE) =============
-$listBox.Add_KeyDown({
-    param($sender, $e)
-    
-    # CTRL + V (Paste Text / Files)
-    if ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::V) {
-        if ([System.Windows.Forms.Clipboard]::ContainsFileDropList()) {
-            $files = [System.Windows.Forms.Clipboard]::GetFileDropList()
-            & $AddFilesToList $files
-        } elseif ([System.Windows.Forms.Clipboard]::ContainsText()) {
-            $text = [System.Windows.Forms.Clipboard]::GetText()
-            $lines = $text -split "`r`n|`n"
-            & $AddFilesToList $lines
-        }
-    }
-    
-    # CTRL + C (Copy Selected)
-    elseif ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::C) {
-        if ($listBox.SelectedItems.Count -gt 0) {
-            $copiedText = ($listBox.SelectedItems -join [Environment]::NewLine)
-            [System.Windows.Forms.Clipboard]::SetText($copiedText)
-        }
-    }
-    
-    # DELETE KEY
-    elseif ($e.KeyCode -eq [System.Windows.Forms.Keys]::Delete) {
-        if ($listBox.SelectedIndices.Count -gt 0) {
-            $indices = @($listBox.SelectedIndices)
-            foreach ($idx in ($indices | Sort-Object -Descending)) {
-                $listBox.Items.RemoveAt($idx)
-            }
-            if (Get-Command "UpdateStats" -ErrorAction SilentlyContinue) { UpdateStats }
-        }
-    }
-})
-
-# ============= CONTEXT MENU =============
-$contextMenu = New-Object System.Windows.Forms.ContextMenuStrip
-
-# 1. Open
-$openFileItem = New-Object System.Windows.Forms.ToolStripMenuItem
-$openFileItem.Text = "Open"
-$openFileItem.Add_Click({
-    if ($listBox.SelectedIndex -ge 0) {
-        $filePath = $listBox.SelectedItem.ToString()
-        if (Test-Path -LiteralPath $filePath) {
-            try {
-                Start-Process $filePath
-            } catch {
-                [void][System.Windows.Forms.MessageBox]::Show("Cannot open file: $($_.Exception.Message)", "Error", "OK", "Error")
-            }
-        } else {
-            [void][System.Windows.Forms.MessageBox]::Show("File not found: $filePath", "Error", "OK", "Error")
-        }
-    } else {
-        [void][System.Windows.Forms.MessageBox]::Show("No file selected.", "Info", "OK", "Information")
-    }
-})
-[void]$contextMenu.Items.Add($openFileItem)
-[void]$contextMenu.Items.Add("-")
-
-# 2. Paste
-$pasteItem = New-Object System.Windows.Forms.ToolStripMenuItem
-$pasteItem.Text = "Paste Files / Paths (Ctrl+V)"
-$pasteItem.Add_Click({
-    if ([System.Windows.Forms.Clipboard]::ContainsFileDropList()) {
-        $files = [System.Windows.Forms.Clipboard]::GetFileDropList()
-        & $AddFilesToList $files
-    } elseif ([System.Windows.Forms.Clipboard]::ContainsText()) {
-        $text = [System.Windows.Forms.Clipboard]::GetText()
-        $lines = $text -split "`r`n|`n"
-        & $AddFilesToList $lines
-    }
-})
-[void]$contextMenu.Items.Add($pasteItem)
-
-# 3. Copy
-$copyItem = New-Object System.Windows.Forms.ToolStripMenuItem
-$copyItem.Text = "Copy Selected Paths (Ctrl+C)"
-$copyItem.Add_Click({
-    if ($listBox.SelectedItems.Count -gt 0) {
-        $copiedText = ($listBox.SelectedItems -join [Environment]::NewLine)
-        [System.Windows.Forms.Clipboard]::SetText($copiedText)
-    }
-})
-[void]$contextMenu.Items.Add($copyItem)
-[void]$contextMenu.Items.Add("-")
-
-# 4. Import TXT File
-$importTxtItem = New-Object System.Windows.Forms.ToolStripMenuItem
-$importTxtItem.Text = "Import List from TXT File..."
-$importTxtItem.Add_Click({
-    $ofd = New-Object System.Windows.Forms.OpenFileDialog
-    $ofd.Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*"
-    if ($ofd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-        $lines = Get-Content -LiteralPath $ofd.FileName
-        & $AddFilesToList $lines
-    }
-})
-[void]$contextMenu.Items.Add($importTxtItem)
-
-# 5. Export TXT File
-$exportTxtItem = New-Object System.Windows.Forms.ToolStripMenuItem
-$exportTxtItem.Text = "Export List to TXT File..."
-$exportTxtItem.Add_Click({
-    if ($listBox.Items.Count -eq 0) { return }
-    $sfd = New-Object System.Windows.Forms.SaveFileDialog
-    $sfd.Filter = "Text Files (*.txt)|*.txt"
-    $sfd.FileName = "pdf_file_list.txt"
-    if ($sfd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-        $listBox.Items | Out-File -FilePath $sfd.FileName -Encoding utf8
-    }
-})
-[void]$contextMenu.Items.Add($exportTxtItem)
-[void]$contextMenu.Items.Add("-")
-
-# 6. Remove Selected
-$removeSelectedItem = New-Object System.Windows.Forms.ToolStripMenuItem
-$removeSelectedItem.Text = "Remove Selected"
-$removeSelectedItem.Add_Click({
-    if ($listBox.SelectedIndices.Count -eq 0) { 
-        [void][System.Windows.Forms.MessageBox]::Show("No files selected.", "Info", "OK", "Information")
-        return 
-    }
-    $indices = @()
-    foreach ($idx in $listBox.SelectedIndices) { $indices += $idx }
-    foreach ($idx in ($indices | Sort-Object -Descending)) { $listBox.Items.RemoveAt($idx) }
-    if (Get-Command "UpdateStats" -ErrorAction SilentlyContinue) { UpdateStats }
-})
-[void]$contextMenu.Items.Add($removeSelectedItem)
-
-# 7. Clear All
-$removeAllItem = New-Object System.Windows.Forms.ToolStripMenuItem
-$removeAllItem.Text = "Clear All"
-$removeAllItem.Add_Click({
-    if ($listBox.Items.Count -gt 0 -and [System.Windows.Forms.MessageBox]::Show("Clear all files?", "Confirm", "YesNo", "Question") -eq "Yes") {
-        $listBox.Items.Clear()
-        if (Get-Command "UpdateStats" -ErrorAction SilentlyContinue) { UpdateStats }
-    }
-})
-[void]$contextMenu.Items.Add($removeAllItem)
-
-$listBox.ContextMenuStrip = $contextMenu
-
-# ============= BUTTONS =============
-$moveUp = New-Object System.Windows.Forms.Button
-$moveUp.Text = "Move Up"
-$moveUp.Location = New-Object System.Drawing.Point(10, 590)
-$moveUp.Size = New-Object System.Drawing.Size(230, 30)
-$moveUp.BackColor = [System.Drawing.Color]::FromArgb(52, 73, 94)
-$moveUp.ForeColor = [System.Drawing.Color]::White
-$moveUp.FlatStyle = "Flat"
-$leftGroup.Controls.Add($moveUp)
-
-$moveDown = New-Object System.Windows.Forms.Button
-$moveDown.Text = "Move Down"
-$moveDown.Location = New-Object System.Drawing.Point(250, 590)
-$moveDown.Size = New-Object System.Drawing.Size(240, 30)
-$moveDown.BackColor = [System.Drawing.Color]::FromArgb(52, 73, 94)
-$moveDown.ForeColor = [System.Drawing.Color]::White
-$moveDown.FlatStyle = "Flat"
-$leftGroup.Controls.Add($moveDown)
-
-$form.Controls.Add($leftGroup)
-
-
-# ============= RIGHT PANEL - PREVIEW =============
-$rightGroup = New-Object System.Windows.Forms.GroupBox
-$rightGroup.Text = "PDF Preview"
-$rightGroup.Location = New-Object System.Drawing.Point(525, 65)
-$rightGroup.Size = New-Object System.Drawing.Size(550, 320)
-$rightGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
-
-$previewBox = New-Object System.Windows.Forms.PictureBox
-$previewBox.Location = New-Object System.Drawing.Point(10, 25)
-$previewBox.Size = New-Object System.Drawing.Size(530, 250)
-$previewBox.SizeMode = "Zoom"
-$previewBox.BackColor = [System.Drawing.Color]::LightGray
-$previewBox.BorderStyle = "FixedSingle"
-$rightGroup.Controls.Add($previewBox)
-
-$previewStatus = New-Object System.Windows.Forms.Label
-$previewStatus.Text = "Click a file to preview"
-$previewStatus.Location = New-Object System.Drawing.Point(10, 285)
-$previewStatus.Size = New-Object System.Drawing.Size(530, 25)
-$previewStatus.TextAlign = "MiddleCenter"
-$previewStatus.Font = New-Object System.Drawing.Font("Segoe UI", 9)
-$previewStatus.ForeColor = [System.Drawing.Color]::Gray
-$rightGroup.Controls.Add($previewStatus)
-
-$form.Controls.Add($rightGroup)
-
-# ============= BOTTOM RIGHT PANEL - CONTROLS =============
-$controlsGroup = New-Object System.Windows.Forms.GroupBox
-$controlsGroup.Text = "Settings"
-$controlsGroup.Location = New-Object System.Drawing.Point(525, 395)
-$controlsGroup.Size = New-Object System.Drawing.Size(550, 330)
-$controlsGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
-
-$y = 30
-
-$chkCompress = New-Object System.Windows.Forms.CheckBox
-$chkCompress.Text = "Compress after merge"
-$chkCompress.Location = New-Object System.Drawing.Point(15, $y)
-$chkCompress.Size = New-Object System.Drawing.Size(200, 25)
-$controlsGroup.Controls.Add($chkCompress)
-$y += 35
-
-$lblMethod = New-Object System.Windows.Forms.Label
-$lblMethod.Text = "Compression Method:"
-$lblMethod.Location = New-Object System.Drawing.Point(15, $y)
-$lblMethod.Size = New-Object System.Drawing.Size(170, 25)
-$controlsGroup.Controls.Add($lblMethod)
-
-$cmbMethod = New-Object System.Windows.Forms.ComboBox
-$cmbMethod.Location = New-Object System.Drawing.Point(185, $y)
-$cmbMethod.Size = New-Object System.Drawing.Size(280, 25)
-$cmbMethod.DropDownStyle = "DropDownList"
-$cmbMethod.Items.AddRange(@(
-    "Smart Auto (Recommended - Detects Text/Images)",
-    "Image Optimized (Aggressive - 40-50% Quality)",
-    "Method 1: Ghostscript Font Subset (90%+)",
-    "Balanced (Text + Images)",
-    "Method 4: Rebuild from Text",
-    "Method 5: Maximal + PDFtk Strip"
-))
-$cmbMethod.SelectedIndex = 0
-$controlsGroup.Controls.Add($cmbMethod)
-$y += 35
-
-$lblQuality = New-Object System.Windows.Forms.Label
-$lblQuality.Text = "Image Quality: 45%"
-$lblQuality.Location = New-Object System.Drawing.Point(15, $y)
-$lblQuality.Size = New-Object System.Drawing.Size(120, 25)
-$controlsGroup.Controls.Add($lblQuality)
-
-$trackQuality = New-Object System.Windows.Forms.TrackBar
-$trackQuality.Location = New-Object System.Drawing.Point(135, $y)
-$trackQuality.Size = New-Object System.Drawing.Size(200, 45)
-$trackQuality.Minimum = 10
-$trackQuality.Maximum = 80
-$trackQuality.TickFrequency = 5
-$trackQuality.Value = 45
-$trackQuality.Add_ValueChanged({
-    $lblQuality.Text = "Image Quality: $($trackQuality.Value)%"
-})
-$controlsGroup.Controls.Add($trackQuality)
-
-$lblQualityNote = New-Object System.Windows.Forms.Label
-$lblQualityNote.Location = New-Object System.Drawing.Point(135, $y + 45)
-$lblQualityNote.Size = New-Object System.Drawing.Size(300, 20)
-$lblQualityNote.Text = "Lower = smaller file, more compression"
-$lblQualityNote.Font = New-Object System.Drawing.Font("Segoe UI", 8)
-$lblQualityNote.ForeColor = [System.Drawing.Color]::Gray
-$controlsGroup.Controls.Add($lblQualityNote)
-$y += 65
-
-$lblVersion = New-Object System.Windows.Forms.Label
-$lblVersion.Text = "PDF Version:"
-$lblVersion.Location = New-Object System.Drawing.Point(15, $y)
-$lblVersion.Size = New-Object System.Drawing.Size(80, 25)
-$controlsGroup.Controls.Add($lblVersion)
-
-$cmbVersion = New-Object System.Windows.Forms.ComboBox
-$cmbVersion.Location = New-Object System.Drawing.Point(100, $y)
-$cmbVersion.Size = New-Object System.Drawing.Size(80, 25)
-$cmbVersion.DropDownStyle = "DropDownList"
-$cmbVersion.Items.AddRange(@("1.4", "1.5", "1.6", "1.7"))
-$cmbVersion.SelectedIndex = 1
-$controlsGroup.Controls.Add($cmbVersion)
-$y += 45
-
-$statsBox = New-Object System.Windows.Forms.GroupBox
-$statsBox.Text = "Statistics"
-$statsBox.Location = New-Object System.Drawing.Point(15, $y)
-$statsBox.Size = New-Object System.Drawing.Size(520, 80)
-$controlsGroup.Controls.Add($statsBox)
-
-$lblStats = New-Object System.Windows.Forms.Label
-$lblStats.Text = "No files loaded"
-$lblStats.Location = New-Object System.Drawing.Point(10, 20)
-$lblStats.Size = New-Object System.Drawing.Size(500, 50)
-$statsBox.Controls.Add($lblStats)
-
-$form.Controls.Add($controlsGroup)
-
-# ============= STATUS BAR =============
-$statusBar = New-Object System.Windows.Forms.StatusStrip
-$statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
-$statusLabel.Text = "QPDF ULTRA FAST - Merges in milliseconds!"
-$statusLabel.Spring = $true
-$statusBar.Items.Add($statusLabel) | Out-Null
-$form.Controls.Add($statusBar)
-
-# ============= PREVIEW FUNCTION =============
-function ShowPreview {
-    param($file)
-    if (Test-Path $file) {
-        $previewStatus.Text = "Loading preview..."
-        $form.Refresh()
-        $tempImg = [System.IO.Path]::GetTempFileName() + ".png"
-        $args = "-q -dNOPAUSE -dBATCH -sDEVICE=png16m -dFirstPage=1 -dLastPage=1 -r100 -sOutputFile=`"$tempImg`" `"$file`""
-        $res = Invoke-External -FileName $script:gs -Arguments $args
-        if ((Test-Path $tempImg)) {
-            if ($previewBox.Image) { $previewBox.Image.Dispose() }
-            $previewBox.Image = [System.Drawing.Image]::FromFile($tempImg)
-            $previewStatus.Text = "Preview loaded"
-            Start-Sleep -Milliseconds 200
-            Remove-Item $tempImg -Force -ErrorAction SilentlyContinue
-        } else {
-            $previewBox.Image = $null
-            $previewStatus.Text = "Cannot preview"
-        }
-    }
-}
-
-# ============= ABOUT BUTTON =============
-# ============= ABOUT BUTTON =============
+# ============= ABOUT DIALOG =============
 function Show-AboutDialog {
     $aboutForm = New-Object System.Windows.Forms.Form
-    $aboutForm.Text = "About Kerim's PDF Merger"
-    $aboutForm.Size = New-Object System.Drawing.Size(700, 500)  # Boyuk olcude
+    $aboutForm.Text = "About Kerim's PDF Tools"
+    $aboutForm.Size = New-Object System.Drawing.Size(700, 500)
     $aboutForm.StartPosition = "CenterParent"
     $aboutForm.FormBorderStyle = "FixedDialog"
     $aboutForm.MaximizeBox = $false
     $aboutForm.MinimizeBox = $false
     $aboutForm.BackColor = [System.Drawing.Color]::White
     
-    # Sol terefde shekil (boyuk)
     if ($script:imageBase64 -ne "PASTE_YOUR_BASE64_IMAGE_STRING_HERE" -and $script:imageBase64.Length -gt 100) {
         try {
             $imageBytes = [System.Convert]::FromBase64String($script:imageBase64)
@@ -1186,16 +805,15 @@ function Show-AboutDialog {
             
             $pictureBox = New-Object System.Windows.Forms.PictureBox
             $pictureBox.Location = New-Object System.Drawing.Point(20, 20)
-            $pictureBox.Size = New-Object System.Drawing.Size(200, 250)  # Boyuk shekil
+            $pictureBox.Size = New-Object System.Drawing.Size(200, 250)
             $pictureBox.SizeMode = "Zoom"
             $pictureBox.Image = $image
             $aboutForm.Controls.Add($pictureBox)
         } catch { }
     }
     
-    # Sag terefde metn (shekilden sonra)
     $label = New-Object System.Windows.Forms.Label
-    $label.Text = "Coded By Tural (with the help of AI).`n`nOglum Kerime ithaf edirem <3`n`n@2026"
+    $label.Text = "V4.Coded By Tural (with the help of AI).`n`nOglum Kerime ithaf edirem <3`n`n@2026"
     $label.Location = New-Object System.Drawing.Point(240, 30)
     $label.Size = New-Object System.Drawing.Size(430, 250)
     $label.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
@@ -1203,7 +821,6 @@ function Show-AboutDialog {
     $label.AutoSize = $false
     $aboutForm.Controls.Add($label)
     
-    # OK buttonu
     $okBtn = New-Object System.Windows.Forms.Button
     $okBtn.Text = "OK"
     $okBtn.Location = New-Object System.Drawing.Point(280, 400)
@@ -1233,238 +850,1639 @@ function Open-FolderInExplorer {
     }
 }
 
-# ============= STATUS FUNCTIONS =============
-function UpdateStatus {
-    param($msg)
-    $statusLabel.Text = $msg
-    $form.Refresh()
-}
+# ============= GLOBAL VARIABLES FOR UI =============
+$script:btnMerge = $null
+$script:listBox = $null
+$script:btnAdd = $null
+$script:btnAddFolder = $null
+$script:btnRemove = $null
+$script:btnClear = $null
+$script:btnAbout = $null
+$script:btnCompress = $null
+$script:mainForm = $null
+$script:lblQuality = $null
 
-function UpdateStats {
-    if ($listBox.Items.Count -gt 0) {
-        $totalSize = 0
-        $valid = 0
-        foreach ($file in $listBox.Items) {
-            if (Test-Path $file) {
-                $totalSize += (Get-ChildItem $file).Length
-                $valid++
-            }
-        }
-        $sizeMB = [math]::Round($totalSize / 1MB, 2)
-        $lblStats.Text = "Files: $valid`r`nTotal Size: $sizeMB MB`r`nOrder: Top to Bottom"
-        $btnMerge.Enabled = ($valid -ge 2)
-    } else {
-        $lblStats.Text = "No files loaded"
-        $btnMerge.Enabled = $false
-    }
-}
-
-# Helper to enable/disable UI during background work (though we stay on UI thread)
 function Set-UIBusy {
     param([bool]$Busy)
-    $btnAdd.Enabled = -not $Busy
-    $btnAddFolder.Enabled = -not $Busy
-    $btnRemove.Enabled = -not $Busy
-    $btnClear.Enabled = -not $Busy
-    $btnAbout.Enabled = -not $Busy
-    $btnCompress.Enabled = -not $Busy
-    $btnMerge.Enabled = (-not $Busy) -and ($listBox.Items.Count -ge 2)
-    $form.UseWaitCursor = $Busy
-    $form.Refresh()
+    if ($script:btnAdd) { $script:btnAdd.Enabled = -not $Busy }
+    if ($script:btnAddFolder) { $script:btnAddFolder.Enabled = -not $Busy }
+    if ($script:btnRemove) { $script:btnRemove.Enabled = -not $Busy }
+    if ($script:btnClear) { $script:btnClear.Enabled = -not $Busy }
+    if ($script:btnAbout) { $script:btnAbout.Enabled = -not $Busy }
+    if ($script:btnCompress) { $script:btnCompress.Enabled = -not $Busy }
+    if ($script:btnMerge -and $script:listBox) {
+        $script:btnMerge.Enabled = (-not $Busy) -and ($script:listBox.Items.Count -ge 2)
+    }
+    if ($script:mainForm) { $script:mainForm.UseWaitCursor = $Busy }
     [System.Windows.Forms.Application]::DoEvents()
 }
 
-# ============= EVENT HANDLERS =============
-$btnAbout.Add_Click({ Show-AboutDialog })
+# ============================================================
+# SPLIT FUNCTIONS
+# ============================================================
 
-$btnAdd.Add_Click({
-    $ofd = New-Object System.Windows.Forms.OpenFileDialog
-    $ofd.Filter = "PDF Files|*.pdf"
-    $ofd.Multiselect = $true
-    if ($ofd.ShowDialog() -eq "OK") {
-        $added = 0
-        foreach ($f in $ofd.FileNames) {
-            if (-not $listBox.Items.Contains($f)) { $listBox.Items.Add($f); $added++ }
-        }
-        UpdateStatus "Added $added files. Total: $($listBox.Items.Count)"
-        UpdateStats
-    }
-})
-
-$btnAddFolder.Add_Click({
-    $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
-    if ($fbd.ShowDialog() -eq "OK") {
-        $files = Get-ChildItem $fbd.SelectedPath -Filter "*.pdf" -File
-        $added = 0
-        foreach ($f in $files) {
-            if (-not $listBox.Items.Contains($f.FullName)) { $listBox.Items.Add($f.FullName); $added++ }
-        }
-        UpdateStatus "Added $added files. Total: $($listBox.Items.Count)"
-        UpdateStats
-    }
-})
-
-$btnRemove.Add_Click({
-    if ($listBox.SelectedIndices.Count -eq 0) {
-        [System.Windows.Forms.MessageBox]::Show("Select files to remove", "Info", "OK", "Information") | Out-Null
-        return
-    }
-    $indices = @()
-    foreach ($idx in $listBox.SelectedIndices) { $indices += $idx }
-    foreach ($idx in ($indices | Sort-Object -Descending)) { $listBox.Items.RemoveAt($idx) }
-    UpdateStatus "Removed $($indices.Count) files. Remaining: $($listBox.Items.Count)"
-    UpdateStats
-})
-
-$btnClear.Add_Click({
-    if ($listBox.Items.Count -gt 0) {
-        if ([System.Windows.Forms.MessageBox]::Show("Clear all files?", "Confirm", "YesNo", "Question") -eq "Yes") {
-            $listBox.Items.Clear()
-            $previewBox.Image = $null
-            $previewStatus.Text = "Click a file to preview"
-            UpdateStatus "List cleared"
-            UpdateStats
-        }
-    }
-})
-
-$moveUp.Add_Click({
-    $idx = $listBox.SelectedIndex
-    if ($idx -gt 0) {
-        $item = $listBox.Items[$idx]
-        $listBox.Items.RemoveAt($idx)
-        $listBox.Items.Insert($idx - 1, $item)
-        $listBox.SetSelected($idx - 1, $true)
-        UpdateStats
-    }
-})
-
-$moveDown.Add_Click({
-    $idx = $listBox.SelectedIndex
-    if ($idx -ge 0 -and $idx -lt ($listBox.Items.Count - 1)) {
-        $item = $listBox.Items[$idx]
-        $listBox.Items.RemoveAt($idx)
-        $listBox.Items.Insert($idx + 1, $item)
-        $listBox.SetSelected($idx + 1, $true)
-        UpdateStats
-    }
-})
-
-$listBox.Add_SelectedIndexChanged({
-    if ($listBox.SelectedIndex -ge 0) { ShowPreview $listBox.SelectedItem.ToString() }
-})
-
-$btnMerge.Add_Click({
-    if ($listBox.Items.Count -lt 2) {
-        [System.Windows.Forms.MessageBox]::Show("Add at least 2 PDF files to merge", "Error", "OK", "Error") | Out-Null
-        return
-    }
-    $sfd = New-Object System.Windows.Forms.SaveFileDialog
-    $sfd.Filter = "PDF Files|*.pdf"
-    $sfd.FileName = "Merged_$(Get-Date -Format 'yyyyMMdd_HHmmss').pdf"
-    if ($sfd.ShowDialog() -ne "OK") { return }
+function Split_GetPageCount {
+    param($inputFile)
     
-    $outPath = $sfd.FileName
-    $doCompress = $chkCompress.Checked
+    if (-not (Test-Path $inputFile)) {
+        return 0
+    }
+    
     try {
-        Set-UIBusy $true
-        Show-WorkingDialog -Message "Working... Please wait (merging PDFs)..."
-        UpdateStatus "Merging $($listBox.Items.Count) files (ULTRA FAST)..."
+        $args = "--show-npages `"$inputFile`""
+        $res = Invoke-External -FileName $script:qpdf -Arguments $args
         
-        $filesToMerge = @(); foreach ($item in $listBox.Items) { $filesToMerge += $item }
-        $startTime = Get-Date
-        $success = MergeFiles $filesToMerge $outPath
-        $elapsed = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 2)
-        
-        if ($success) {
-            if ($doCompress) {
-                UpdateStatus "Compressing merged PDF..."
-                Update-WorkingMessage "Working... Please wait (compressing result)..."
-                $compressed = CompressFileSmart $outPath $outPath
-                if ($compressed) {
-                    $size = [math]::Round((Get-ChildItem $outPath).Length / 1MB, 2)
-                    [System.Windows.Forms.MessageBox]::Show("Merge + Compression complete!`n`nFiles merged: $($filesToMerge.Count)`nSize: $size MB`nTime: ${elapsed}s", "Success", "OK", "Information") | Out-Null
-                    UpdateStatus "Merge + Compression complete (${elapsed}s)"
-                } else {
-                    UpdateStatus "Merge complete (${elapsed}s), compression failed"
-                }
-            } else {
-                $size = [math]::Round((Get-ChildItem $outPath).Length / 1MB, 2)
-                [System.Windows.Forms.MessageBox]::Show("Merge complete!`n`nFiles merged: $($filesToMerge.Count)`nSize: $size MB`nTime: ${elapsed}s", "Success", "OK", "Information") | Out-Null
-                UpdateStatus "Merge complete (${elapsed}s)"
+        if ($res.ExitCode -eq 0 -and $res.StdOut) {
+            $pageCount = [int]$res.StdOut.Trim()
+            if ($pageCount -gt 0) {
+                return $pageCount
             }
-            # Open folder in Explorer after successful merge
-            Open-FolderInExplorer $outPath
+        }
+        
+        $args2 = "--check `"$inputFile`""
+        $res2 = Invoke-External -FileName $script:qpdf -Arguments $args2
+        $lines = $res2.StdErr -split "`r`n|`n"
+        foreach ($line in $lines) {
+            if ($line -match "file has (\d+) pages") {
+                return [int]$matches[1]
+            }
+        }
+        
+        return 0
+    } catch {
+        return 0
+    }
+}
+
+function Split_DetectPageCount {
+    param($inputFile)
+    try {
+        $script:splitLblStatus.Text = "Detecting page count..."
+        [System.Windows.Forms.Application]::DoEvents()
+        
+        $pageCount = Split_GetPageCount $inputFile
+        
+        if ($pageCount -gt 0) {
+            $script:splitLblPageCount.Text = "Pages: $pageCount"
+            $script:splitLblPageCount.ForeColor = [System.Drawing.Color]::Green
+            $script:splitLblStatus.Text = "Found $pageCount pages. Ready to split."
+            return $pageCount
         } else {
-            [System.Windows.Forms.MessageBox]::Show("Merge failed! Check console for details.", "Error", "OK", "Error") | Out-Null
-            UpdateStatus "Merge failed"
+            $script:splitLblPageCount.Text = "Pages: Could not detect"
+            $script:splitLblPageCount.ForeColor = [System.Drawing.Color]::Red
+            $script:splitLblStatus.Text = "Could not detect page count. Please verify the PDF."
+            return 0
         }
     } catch {
-        [System.Windows.Forms.MessageBox]::Show("Error during merge: $($_.Exception.Message)", "Error", "OK", "Error") | Out-Null
-        UpdateStatus "Error: $($_.Exception.Message)"
-    } finally {
-        Hide-WorkingDialog
-        Set-UIBusy $false
+        $script:splitLblPageCount.Text = "Pages: Error detecting"
+        $script:splitLblPageCount.ForeColor = [System.Drawing.Color]::Red
+        $script:splitLblStatus.Text = "Error detecting pages: $($_.Exception.Message)"
+        return 0
     }
-})
+}
 
-$btnCompress.Add_Click({
-    $ofd = New-Object System.Windows.Forms.OpenFileDialog
-    $ofd.Filter = "PDF Files|*.pdf"
-    $ofd.Title = "Select PDF to compress"
-    if ($ofd.ShowDialog() -ne "OK") { return }
+function Split_PerformSplit {
+    param([string]$inputFile, [string]$rangesText, [string]$destFolder)
     
-    $sfd = New-Object System.Windows.Forms.SaveFileDialog
-    $sfd.Filter = "PDF Files|*.pdf"
-    $sfd.FileName = "Compressed_$(Get-Date -Format 'yyyyMMdd_HHmmss').pdf"
-    if ($sfd.ShowDialog() -ne "OK") { return }
+    Write-Host "`n========================================" -ForegroundColor Magenta
+    Write-Host "SPLIT DEBUG INFORMATION" -ForegroundColor Magenta
+    Write-Host "========================================" -ForegroundColor Magenta
+    Write-Host "Input File: $inputFile" -ForegroundColor Cyan
+    Write-Host "Ranges Text RAW: '$rangesText'" -ForegroundColor Cyan
+    Write-Host "Ranges Text Length: $($rangesText.Length)" -ForegroundColor Cyan
+    Write-Host "Destination: $destFolder" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Magenta
     
     try {
+        $script:splitBtnSplit.Enabled = $false
+        $script:splitBtnSplit.Text = "SPLITTING..."
         Set-UIBusy $true
-        Show-WorkingDialog -Message "Working... Please wait (analyzing & compressing)..."
-        UpdateStatus "Analyzing and compressing..."
+        Show-WorkingDialog -Message "Working... Please wait (splitting PDF)..."
         
-        $success = CompressFileSmart $ofd.FileName $sfd.FileName
-        if ($success) {
-            UpdateStatus "Compression complete"
-            # Open folder in Explorer after successful compression
-            Open-FolderInExplorer $sfd.FileName
-        } else {
-            [System.Windows.Forms.MessageBox]::Show("Compression failed", "Error", "OK", "Error") | Out-Null
-            UpdateStatus "Compression failed"
+        $script:splitLblStatus.Text = "Parsing page ranges..."
+        [System.Windows.Forms.Application]::DoEvents()
+        
+        Write-Host "DEBUG: Calling Split_ParsePageRanges with: '$rangesText'" -ForegroundColor Cyan
+        $pageRanges = Split_ParsePageRanges -pageRangeSpec $rangesText
+        
+        Write-Host "`nDEBUG: Parsed $($pageRanges.Count) ranges" -ForegroundColor Cyan
+        
+        if ($pageRanges.Count -eq 0) {
+            Write-Host "DEBUG: No valid ranges found!" -ForegroundColor Red
+            [System.Windows.Forms.MessageBox]::Show("Invalid page range format. Please check your input.`n`nExamples:`n- 1-3, 4-6, 7-10`n- 1,2,3,4,5`n- 1-5, 7, 9-12`n`nYour input: '$rangesText'", "Error", "OK", "Error")
+            return
         }
+        
+        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($inputFile)
+        $totalParts = $pageRanges.Count
+        $successCount = 0
+        
+        Write-Host "DEBUG: Base name: $baseName" -ForegroundColor Cyan
+        Write-Host "DEBUG: Total parts: $totalParts" -ForegroundColor Cyan
+        
+        $script:splitLblStatus.Text = "Splitting into $totalParts parts..."
+        [System.Windows.Forms.Application]::DoEvents()
+        
+        for ($i = 0; $i -lt $pageRanges.Count; $i++) {
+            $range = $pageRanges[$i]
+            $partNum = $i + 1
+            $outputFile = [System.IO.Path]::Combine($destFolder, "$baseName$partNum`parts.pdf")
+            
+            Write-Host "`nDEBUG: Creating part $partNum" -ForegroundColor Yellow
+            Write-Host "DEBUG:   Pages: $($range.Start)-$($range.End)" -ForegroundColor Yellow
+            Write-Host "DEBUG:   Output: $outputFile" -ForegroundColor Yellow
+            
+            $script:splitLblStatus.Text = "Creating part $partNum of $totalParts..."
+            Update-WorkingMessage "Working... Please wait (splitting part $partNum of $totalParts)..."
+            [System.Windows.Forms.Application]::DoEvents()
+            
+            $startPage = $range.Start
+            $endPage = $range.End
+            
+            if ($startPage -eq $endPage) {
+                $pageSpec = "$startPage"
+            } else {
+                $pageSpec = "$startPage-$endPage"
+            }
+            
+            $args = "`"$inputFile`" --pages `"$inputFile`" $pageSpec -- `"$outputFile`""
+            
+            Write-Host "DEBUG: QPDF Command: $script:qpdf $args" -ForegroundColor White
+            
+            $res = Invoke-External -FileName $script:qpdf -Arguments $args
+            
+            Write-Host "DEBUG: Exit Code: $($res.ExitCode)" -ForegroundColor Cyan
+            if ($res.StdErr) { Write-Host "DEBUG: STDERR: $($res.StdErr)" -ForegroundColor Red }
+            if ($res.StdOut) { Write-Host "DEBUG: STDOUT: $($res.StdOut)" -ForegroundColor Gray }
+            
+            if ($res.ExitCode -eq 0 -and (Test-Path $outputFile) -and (Get-ChildItem $outputFile).Length -gt 0) {
+                $successCount++
+                Write-Host "DEBUG: Part $partNum created successfully" -ForegroundColor Green
+            } else {
+                $script:splitLblStatus.Text = "Error creating part $partNum"
+                Write-Host "DEBUG: ERROR creating part $partNum" -ForegroundColor Red
+                [System.Windows.Forms.MessageBox]::Show("Error creating part $partNum. Check console for details.", "Error", "OK", "Error")
+            }
+        }
+        
+        Write-Host "`nDEBUG: Split complete. Success: $successCount of $totalParts" -ForegroundColor Cyan
+        
+        if ($successCount -eq $totalParts) {
+            $script:splitLblStatus.Text = "Split complete! Created $successCount parts in: $destFolder"
+            Update-WorkingMessage "Complete! Split into $successCount parts."
+            
+            [System.Windows.Forms.MessageBox]::Show("PDF Split Complete!`n`nInput file: $([System.IO.Path]::GetFileName($inputFile))`nParts created: $successCount`nDestination: $destFolder", "Split Complete", "OK", "Information")
+            
+            Open-FolderInExplorer $destFolder
+        } else {
+            $script:splitLblStatus.Text = "Split completed with errors: $successCount of $totalParts parts created."
+        }
+        
     } catch {
-        [System.Windows.Forms.MessageBox]::Show("Error during compression: $($_.Exception.Message)", "Error", "OK", "Error") | Out-Null
-        UpdateStatus "Error: $($_.Exception.Message)"
+        Write-Host "DEBUG: EXCEPTION: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "DEBUG: STACK: $($_.ScriptStackTrace)" -ForegroundColor Red
+        $script:splitLblStatus.Text = "Error: $($_.Exception.Message)"
+        [System.Windows.Forms.MessageBox]::Show("Error during split: $($_.Exception.Message)", "Error", "OK", "Error")
     } finally {
         Hide-WorkingDialog
         Set-UIBusy $false
+        $script:splitBtnSplit.Text = "SPLIT PDF"
+        $script:splitBtnSplit.Enabled = $true
+        [System.Windows.Forms.Application]::DoEvents()
+        
+        Write-Host "========================================" -ForegroundColor Magenta
+        Write-Host "END SPLIT DEBUG" -ForegroundColor Magenta
+        Write-Host "========================================" -ForegroundColor Magenta
     }
-})
+}
 
-# Drag and drop
-$listBox.AllowDrop = $true
-$listBox.Add_DragEnter({ $_.Effect = "Copy" })
-$listBox.Add_DragDrop({
-    $files = $_.Data.GetData("FileDrop")
-    $added = 0
-    foreach ($f in $files) {
-        if ($f -like "*.pdf" -and -not $listBox.Items.Contains($f)) { $listBox.Items.Add($f); $added++ }
+function Split_UsingQPDFSplitPages {
+    param(
+        [string]$inputFile,
+        [string]$destFolder,
+        [int]$pages
+    )
+    try {
+        $script:splitBtnSplit.Enabled = $false
+        $script:splitBtnSplit.Text = "SPLITTING..."
+        Set-UIBusy $true
+        Show-WorkingDialog -Message "Working... Please wait (splitting PDF into $pages-page chunks)..."
+        
+        $baseName = [System.IO.Path]::GetFileNameWithoutExtension($inputFile)
+        $destPattern = [System.IO.Path]::Combine($destFolder, "$baseName`_%d.pdf")
+        $args = "--split-pages=$pages `"$inputFile`" `"$destPattern`""
+        
+        Write-Host "DEBUG: QPDF SplitPages Command: $script:qpdf $args" -ForegroundColor White
+        $res = Invoke-External -FileName $script:qpdf -Arguments $args
+        
+        if ($res.ExitCode -eq 0) {
+            Write-Host "DEBUG: QPDF SplitPages OK" -ForegroundColor Green
+            $script:splitLblStatus.Text = "Split complete! Files saved to: $destFolder"
+            [System.Windows.Forms.MessageBox]::Show("Split complete using QPDF's --split-pages!`n`nInput file: $([System.IO.Path]::GetFileName($inputFile))`nPages per file: $pages`nDestination: $destFolder", "Split Complete", "OK", "Information")
+            Open-FolderInExplorer $destFolder
+        } else {
+            Write-Host "DEBUG: QPDF SplitPages ERROR" -ForegroundColor Red
+            $script:splitLblStatus.Text = "Split failed using QPDF's --split-pages."
+            [System.Windows.Forms.MessageBox]::Show("Split failed using QPDF's --split-pages.", "Error", "OK", "Error")
+        }
+    } catch {
+        Write-Host "DEBUG: EXCEPTION: $($_.Exception.Message)" -ForegroundColor Red
+        $script:splitLblStatus.Text = "Error: $($_.Exception.Message)"
+        [System.Windows.Forms.MessageBox]::Show("Error during split: $($_.Exception.Message)", "Error", "OK", "Error")
+    } finally {
+        Hide-WorkingDialog
+        Set-UIBusy $false
+        $script:splitBtnSplit.Text = "SPLIT PDF"
+        $script:splitBtnSplit.Enabled = $true
+        [System.Windows.Forms.Application]::DoEvents()
     }
-    UpdateStatus "Added $added files via drag and drop"
-    UpdateStats
-})
+}
 
-# Keyboard shortcuts
-$form.KeyPreview = $true
-$form.Add_KeyDown({
-    if ($_.KeyCode -eq "Delete") {
-        $btnRemove.PerformClick()
-        $_.Handled = $true
+# ============================================================
+# PDF SPLIT TAB - CREATES THE UI
+# ============================================================
+
+function Create-SplitTab {
+    $splitTab = New-Object System.Windows.Forms.TabPage
+    $splitTab.Text = "PDF Split"
+    $splitTab.BackColor = [System.Drawing.Color]::FromArgb(240, 242, 245)
+
+    # Input section
+    $inputGroup = New-Object System.Windows.Forms.GroupBox
+    $inputGroup.Text = "Input PDF File"
+    $inputGroup.Location = New-Object System.Drawing.Point(10, 10)
+    $inputGroup.Size = New-Object System.Drawing.Size(760, 90)
+    $inputGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    
+    $txtInputFile = New-Object System.Windows.Forms.TextBox
+    $txtInputFile.Name = "txtInputFile"
+    $txtInputFile.Location = New-Object System.Drawing.Point(10, 30)
+    $txtInputFile.Size = New-Object System.Drawing.Size(600, 25)
+    $txtInputFile.ReadOnly = $true
+    $txtInputFile.BackColor = [System.Drawing.Color]::White
+    $txtInputFile.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $inputGroup.Controls.Add($txtInputFile)
+    
+    $btnBrowseInput = New-Object System.Windows.Forms.Button
+    $btnBrowseInput.Text = "Browse..."
+    $btnBrowseInput.Location = New-Object System.Drawing.Point(620, 28)
+    $btnBrowseInput.Size = New-Object System.Drawing.Size(60, 28)
+    $btnBrowseInput.BackColor = [System.Drawing.Color]::FromArgb(52, 152, 219)
+    $btnBrowseInput.ForeColor = [System.Drawing.Color]::White
+    $btnBrowseInput.FlatStyle = "Flat"
+    $inputGroup.Controls.Add($btnBrowseInput)
+    
+    $btnAutoSplit = New-Object System.Windows.Forms.Button
+    $btnAutoSplit.Text = "Auto-Split All Pages"
+    $btnAutoSplit.Location = New-Object System.Drawing.Point(690, 28)
+    $btnAutoSplit.Size = New-Object System.Drawing.Size(60, 28)
+    $btnAutoSplit.BackColor = [System.Drawing.Color]::FromArgb(46, 204, 113)
+    $btnAutoSplit.ForeColor = [System.Drawing.Color]::White
+    $btnAutoSplit.FlatStyle = "Flat"
+    $btnAutoSplit.Font = New-Object System.Drawing.Font("Segoe UI", 7, [System.Drawing.FontStyle]::Bold)
+    $btnAutoSplit.Enabled = $false
+    $inputGroup.Controls.Add($btnAutoSplit)
+    
+    $lblPageCount = New-Object System.Windows.Forms.Label
+    $lblPageCount.Text = "Pages: 0"
+    $lblPageCount.Location = New-Object System.Drawing.Point(10, 60)
+    $lblPageCount.Size = New-Object System.Drawing.Size(200, 20)
+    $lblPageCount.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $lblPageCount.ForeColor = [System.Drawing.Color]::Gray
+    $inputGroup.Controls.Add($lblPageCount)
+    $splitTab.Controls.Add($inputGroup)
+
+    # Page Range section
+    $rangeGroup = New-Object System.Windows.Forms.GroupBox
+    $rangeGroup.Text = "Page Ranges (e.g., 1-3, 4-6, 7-10 or 1,2,3,4)"
+    $rangeGroup.Location = New-Object System.Drawing.Point(10, 110)
+    $rangeGroup.Size = New-Object System.Drawing.Size(760, 100)
+    $rangeGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    
+    $txtPageRanges = New-Object System.Windows.Forms.TextBox
+    $txtPageRanges.Name = "txtPageRanges"
+    $txtPageRanges.Location = New-Object System.Drawing.Point(10, 30)
+    $txtPageRanges.Size = New-Object System.Drawing.Size(740, 25)
+    $txtPageRanges.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $txtPageRanges.Text = "1-3, 4-6, 7-10"
+    $txtPageRanges.ForeColor = [System.Drawing.Color]::Gray
+    $rangeGroup.Controls.Add($txtPageRanges)
+    
+    $lblRangeHint = New-Object System.Windows.Forms.Label
+    $lblRangeHint.Text = "Examples: '1-3, 4-6, 7-10' (ranges) OR '1,3,5,7' (single pages) OR '1-5, 7, 9-12' (mixed)"
+    $lblRangeHint.Location = New-Object System.Drawing.Point(10, 55)
+    $lblRangeHint.Size = New-Object System.Drawing.Size(740, 20)
+    $lblRangeHint.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $lblRangeHint.ForeColor = [System.Drawing.Color]::Gray
+    $rangeGroup.Controls.Add($lblRangeHint)
+    
+    $chkSplitEveryN = New-Object System.Windows.Forms.CheckBox
+    $chkSplitEveryN.Name = "chkSplitEveryN"
+    $chkSplitEveryN.Text = "Split every N pages"
+    $chkSplitEveryN.Location = New-Object System.Drawing.Point(10, 75)
+    $chkSplitEveryN.Size = New-Object System.Drawing.Size(150, 25)
+    $chkSplitEveryN.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $rangeGroup.Controls.Add($chkSplitEveryN)
+    
+    $txtSplitN = New-Object System.Windows.Forms.NumericUpDown
+    $txtSplitN.Name = "txtSplitN"
+    $txtSplitN.Location = New-Object System.Drawing.Point(165, 75)
+    $txtSplitN.Size = New-Object System.Drawing.Size(60, 25)
+    $txtSplitN.Minimum = 1
+    $txtSplitN.Maximum = 999
+    $txtSplitN.Value = 2
+    $txtSplitN.Enabled = $false
+    $rangeGroup.Controls.Add($txtSplitN)
+    
+    # Event handler for checkbox
+    $chkSplitEveryN.Add_CheckedChanged({
+        try {
+            $this.Enabled = $false
+            
+            $ctrlPageRanges = $this.Parent.Controls["txtPageRanges"]
+            $ctrlSplitN = $this.Parent.Controls["txtSplitN"]
+            
+            if ($this.Checked) {
+                $ctrlSplitN.Enabled = $true
+                $ctrlPageRanges.Enabled = $false
+                $ctrlPageRanges.BackColor = [System.Drawing.Color]::LightGray
+                $ctrlPageRanges.ForeColor = [System.Drawing.Color]::Gray
+            } else {
+                $ctrlSplitN.Enabled = $false
+                $ctrlPageRanges.Enabled = $true
+                $ctrlPageRanges.BackColor = [System.Drawing.Color]::White
+                $ctrlPageRanges.ForeColor = [System.Drawing.Color]::Black
+            }
+        } catch {
+            Write-Host "Checkbox event error: $($_.Exception.Message)" -ForegroundColor Red
+        } finally {
+            $this.Enabled = $true
+        }
+    })
+    
+    $splitTab.Controls.Add($rangeGroup)
+
+    # Destination section
+    $destGroup = New-Object System.Windows.Forms.GroupBox
+    $destGroup.Text = "Destination Folder"
+    $destGroup.Location = New-Object System.Drawing.Point(10, 220)
+    $destGroup.Size = New-Object System.Drawing.Size(760, 70)
+    $destGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    
+    $txtDestFolder = New-Object System.Windows.Forms.TextBox
+    $txtDestFolder.Name = "txtDestFolder"
+    $txtDestFolder.Location = New-Object System.Drawing.Point(10, 30)
+    $txtDestFolder.Size = New-Object System.Drawing.Size(660, 25)
+    $txtDestFolder.ReadOnly = $true
+    $txtDestFolder.BackColor = [System.Drawing.Color]::White
+    $txtDestFolder.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $txtDestFolder.Text = [System.Environment]::GetFolderPath("Desktop")
+    $destGroup.Controls.Add($txtDestFolder)
+    
+    $btnBrowseDest = New-Object System.Windows.Forms.Button
+    $btnBrowseDest.Text = "Browse..."
+    $btnBrowseDest.Location = New-Object System.Drawing.Point(680, 28)
+    $btnBrowseDest.Size = New-Object System.Drawing.Size(70, 28)
+    $btnBrowseDest.BackColor = [System.Drawing.Color]::FromArgb(52, 152, 219)
+    $btnBrowseDest.ForeColor = [System.Drawing.Color]::White
+    $btnBrowseDest.FlatStyle = "Flat"
+    $destGroup.Controls.Add($btnBrowseDest)
+    $splitTab.Controls.Add($destGroup)
+
+    $btnSplit = New-Object System.Windows.Forms.Button
+    $btnSplit.Name = "btnSplit"
+    $btnSplit.Text = "SPLIT PDF"
+    $btnSplit.Location = New-Object System.Drawing.Point(10, 300)
+    $btnSplit.Size = New-Object System.Drawing.Size(760, 50)
+    $btnSplit.BackColor = [System.Drawing.Color]::FromArgb(155, 89, 182)
+    $btnSplit.ForeColor = [System.Drawing.Color]::White
+    $btnSplit.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+    $btnSplit.FlatStyle = "Flat"
+    $btnSplit.Enabled = $false
+    $splitTab.Controls.Add($btnSplit)
+
+    $lblSplitStatus = New-Object System.Windows.Forms.Label
+    $lblSplitStatus.Name = "lblSplitStatus"
+    $lblSplitStatus.Text = "Ready"
+    $lblSplitStatus.Location = New-Object System.Drawing.Point(10, 360)
+    $lblSplitStatus.Size = New-Object System.Drawing.Size(760, 30)
+    $lblSplitStatus.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $lblSplitStatus.ForeColor = [System.Drawing.Color]::Gray
+    $lblSplitStatus.TextAlign = "MiddleLeft"
+    $splitTab.Controls.Add($lblSplitStatus)
+
+    # STORE CONTROLS IN SCRIPT SCOPE
+    $script:splitTxtInputFile = $txtInputFile
+    $script:splitBtnAutoSplit = $btnAutoSplit
+    $script:splitBtnSplit = $btnSplit
+    $script:splitTxtDestFolder = $txtDestFolder
+    $script:splitLblPageCount = $lblPageCount
+    $script:splitLblStatus = $lblSplitStatus
+    $script:splitTxtPageRanges = $txtPageRanges
+    $script:splitChkSplitEveryN = $chkSplitEveryN
+    $script:splitTxtSplitN = $txtSplitN
+
+    # EVENT HANDLERS
+    
+    $btnBrowseInput.Add_Click({
+        $ofd = New-Object System.Windows.Forms.OpenFileDialog
+        $ofd.Filter = "PDF Files|*.pdf"
+        $ofd.Title = "Select PDF to split"
+        if ($ofd.ShowDialog() -eq "OK") {
+            $script:splitTxtInputFile.Text = $ofd.FileName
+            $script:splitTxtInputFile.ForeColor = [System.Drawing.Color]::Black
+            $script:splitBtnAutoSplit.Enabled = $true
+            $script:splitBtnSplit.Enabled = $true
+            $pageCount = Split_DetectPageCount $ofd.FileName
+        }
+    })
+    
+    $txtInputFile.AllowDrop = $true
+    $txtInputFile.Add_DragEnter({
+        if ($_.Data.GetDataPresent([System.Windows.Forms.DataFormats]::FileDrop)) {
+            $_.Effect = [System.Windows.Forms.DragDropEffects]::Copy
+        }
+    })
+    $txtInputFile.Add_DragDrop({
+        $files = $_.Data.GetData([System.Windows.Forms.DataFormats]::FileDrop)
+        foreach ($f in $files) {
+            if ($f -like "*.pdf") {
+                $script:splitTxtInputFile.Text = $f
+                $script:splitTxtInputFile.ForeColor = [System.Drawing.Color]::Black
+                $script:splitBtnAutoSplit.Enabled = $true
+                $script:splitBtnSplit.Enabled = $true
+                $pageCount = Split_DetectPageCount $f
+                break
+            }
+        }
+    })
+    
+    $btnAutoSplit.Add_Click({
+        $pageCount = Split_DetectPageCount $script:splitTxtInputFile.Text
+        if ($pageCount -gt 0) {
+            $ranges = @()
+            for ($i = 1; $i -le $pageCount; $i++) {
+                $ranges += $i
+            }
+            $script:splitTxtPageRanges.Text = ($ranges -join ", ")
+            $script:splitTxtPageRanges.ForeColor = [System.Drawing.Color]::Black
+        }
+    })
+    
+    $btnBrowseDest.Add_Click({
+        $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
+        $fbd.SelectedPath = $script:splitTxtDestFolder.Text
+        if ($fbd.ShowDialog() -eq "OK") {
+            $script:splitTxtDestFolder.Text = $fbd.SelectedPath
+        }
+    })
+    
+    $btnSplit.Add_Click({
+        Write-Host "DEBUG: Split button clicked!" -ForegroundColor Cyan
+        
+        if ([string]::IsNullOrWhiteSpace($script:splitTxtInputFile.Text) -or -not (Test-Path $script:splitTxtInputFile.Text)) {
+            [System.Windows.Forms.MessageBox]::Show("Please select a valid PDF file.", "Error", "OK", "Error")
+            return
+        }
+        
+        if (-not (Test-Path $script:splitTxtDestFolder.Text)) {
+            [System.Windows.Forms.MessageBox]::Show("Please select a valid destination folder.", "Error", "OK", "Error")
+            return
+        }
+        
+        if ($script:splitChkSplitEveryN.Checked) {
+            $n = [int]$script:splitTxtSplitN.Value
+            if ($n -lt 1) {
+                [System.Windows.Forms.MessageBox]::Show("N must be at least 1.", "Error", "OK", "Error")
+                return
+            }
+            Split_UsingQPDFSplitPages $script:splitTxtInputFile.Text $script:splitTxtDestFolder.Text $n
+        } else {
+            $rangesText = $script:splitTxtPageRanges.Text
+            if ([string]::IsNullOrWhiteSpace($rangesText)) {
+                [System.Windows.Forms.MessageBox]::Show("Please specify page ranges to split.", "Error", "OK", "Error")
+                return
+            }
+            Split_PerformSplit $script:splitTxtInputFile.Text $rangesText $script:splitTxtDestFolder.Text
+        }
+    })
+    
+    return $splitTab
+}
+
+# ============================================================
+# ENCRYPTION FUNCTION
+# ============================================================
+
+function Encrypt_PerformEncryption {
+    param($inputFile, $outputFile, $userPass, $ownerPass)
+    
+    Write-Host "`n========================================" -ForegroundColor Cyan
+    Write-Host "ENCRYPTION DEBUG INFORMATION" -ForegroundColor Yellow
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "Input File: $inputFile" -ForegroundColor Gray
+    Write-Host "Output File: $outputFile" -ForegroundColor Gray
+    Write-Host "User Password: $(if ($userPass) { '***' } else { '(empty - no open password)' })" -ForegroundColor Gray
+    Write-Host "Owner Password: $(if ($ownerPass) { '***' } else { '(empty)' })" -ForegroundColor Gray
+    Write-Host "QPDF Path: $script:qpdf" -ForegroundColor Gray
+    Write-Host "========================================" -ForegroundColor Cyan
+    
+    $hasUserPass = -not [string]::IsNullOrWhiteSpace($userPass)
+    $hasOwnerPass = -not [string]::IsNullOrWhiteSpace($ownerPass)
+    
+    if ($hasUserPass -and $hasOwnerPass) {
+        Write-Host "INFO: Both User and Owner passwords set - file will require password to open" -ForegroundColor Green
+    } elseif ($hasUserPass -and -not $hasOwnerPass) {
+        Write-Host "INFO: Only User password set - file will require password to open but no restrictions" -ForegroundColor Yellow
+    } elseif (-not $hasUserPass -and $hasOwnerPass) {
+        Write-Host "INFO: Only Owner password set - file opens freely but has restrictions" -ForegroundColor Yellow
+    } else {
+        Write-Host "ERROR: No passwords set!" -ForegroundColor Red
+        [System.Windows.Forms.MessageBox]::Show("Please enter at least one password.", "Error", "OK", "Error")
+        return
     }
-})
+    
+    try {
+        $script:encBtnEncrypt.Enabled = $false
+        $script:encBtnEncrypt.Text = "ENCRYPTING..."
+        Set-UIBusy $true
+        Show-WorkingDialog -Message "Working... Please wait (encrypting PDF)..."
+        
+        $script:encLblStatus.Text = "Encrypting with AES-256..."
+        [System.Windows.Forms.Application]::DoEvents()
+        
+        $args = @()
+        $args += "--encrypt"
+        
+        if ($hasUserPass) {
+            $args += "`"$userPass`""
+            Write-Host "DEBUG: User password provided (length: $($userPass.Length))" -ForegroundColor Green
+        } else {
+            $args += '""'
+            Write-Host "DEBUG: User password is empty - file will open without password" -ForegroundColor Yellow
+        }
+        
+        if ($hasOwnerPass) {
+            $args += "`"$ownerPass`""
+            Write-Host "DEBUG: Owner password provided (length: $($ownerPass.Length))" -ForegroundColor Green
+        } else {
+            $args += '""'
+            Write-Host "DEBUG: Owner password is empty - no restrictions will be applied" -ForegroundColor Yellow
+        }
+        
+        $args += "256"
+        $args += "--print=full"
+        $args += "--modify=none"
+        $args += "--extract=y"
+        $args += "--accessibility=y"
+        $args += "--annotate=n"
+        $args += "--form=y"
+        $args += "--assemble=n"
+        $args += "--"
+        $args += "`"$inputFile`""
+        $args += "`"$outputFile`""
+        
+        $fullArgs = $args -join " "
+        
+        Write-Host "`n========================================" -ForegroundColor Yellow
+        Write-Host "QPDF COMMAND:" -ForegroundColor Yellow
+        Write-Host "========================================" -ForegroundColor Yellow
+        Write-Host "$script:qpdf $fullArgs" -ForegroundColor White
+        Write-Host "========================================" -ForegroundColor Yellow
+        Write-Host ""
+        
+        $script:encLblStatus.Text = "Running QPDF encryption..."
+        [System.Windows.Forms.Application]::DoEvents()
+        
+        $res = Invoke-External -FileName $script:qpdf -Arguments $fullArgs
+        
+        Write-Host "`n========================================" -ForegroundColor Cyan
+        Write-Host "QPDF RESULT:" -ForegroundColor Cyan
+        Write-Host "========================================" -ForegroundColor Cyan
+        Write-Host "Exit Code: $($res.ExitCode)" -ForegroundColor $(if ($res.ExitCode -eq 0) { 'Green' } else { 'Red' })
+        if ($res.StdOut) {
+            Write-Host "STDOUT:" -ForegroundColor Gray
+            Write-Host $res.StdOut -ForegroundColor Gray
+        }
+        if ($res.StdErr) {
+            Write-Host "STDERR:" -ForegroundColor Red
+            Write-Host $res.StdErr -ForegroundColor Red
+        }
+        Write-Host "========================================" -ForegroundColor Cyan
+        Write-Host ""
+        
+        $outputExists = Test-Path $outputFile
+        $outputSize = if ($outputExists) { (Get-ChildItem $outputFile).Length } else { 0 }
+        
+        Write-Host "Output file exists: $outputExists" -ForegroundColor $(if ($outputExists) { 'Green' } else { 'Red' })
+        Write-Host "Output file size: $outputSize bytes" -ForegroundColor Gray
+        
+        if ($res.ExitCode -eq 0 -and $outputExists -and $outputSize -gt 0) {
+            $fileSize = [math]::Round($outputSize / 1KB, 0)
+            $script:encLblStatus.Text = "Encryption complete! File saved: $outputFile"
+            Update-WorkingMessage "Encryption complete! File saved."
+            
+            $successMsg = "PDF Encryption Complete!`n`nInput: $([System.IO.Path]::GetFileName($inputFile))`nOutput: $([System.IO.Path]::GetFileName($outputFile))`nSize: $fileSize KB`n`nEncryption: AES-256`n`n"
+            if ($hasUserPass -and $hasOwnerPass) {
+                $successMsg += "Password required to OPEN the file`n"
+                $successMsg += "Owner password required to change permissions"
+            } elseif ($hasUserPass) {
+                $successMsg += "Password required to OPEN the file`n`n(No restrictions applied)"
+            } else {
+                $successMsg += "No password required to OPEN`n"
+                $successMsg += "Owner password required to change permissions`n`n"
+                $successMsg += "File opens freely but has restrictions"
+            }
+            
+            Write-Host "`n========================================" -ForegroundColor Green
+            Write-Host "ENCRYPTION SUCCESSFUL!" -ForegroundColor Green
+            Write-Host "========================================" -ForegroundColor Green
+            Write-Host "Output: $outputFile" -ForegroundColor Green
+            Write-Host "Size: $fileSize KB" -ForegroundColor Green
+            Write-Host "User Password: $(if ($hasUserPass) { 'SET (required to open)' } else { 'NOT SET (opens freely)' })" -ForegroundColor $(if ($hasUserPass) { 'Green' } else { 'Yellow' })
+            Write-Host "Owner Password: $(if ($hasOwnerPass) { 'SET (required for permissions)' } else { 'NOT SET' })" -ForegroundColor $(if ($hasOwnerPass) { 'Green' } else { 'Yellow' })
+            Write-Host "========================================" -ForegroundColor Green
+            
+            [System.Windows.Forms.MessageBox]::Show($successMsg, "Encryption Complete", "OK", "Information")
+            
+            Open-FolderInExplorer $outputFile
+        } else {
+            $script:encLblStatus.Text = "Encryption failed. Check console for details."
+            
+            Write-Host "`n========================================" -ForegroundColor Red
+            Write-Host "ENCRYPTION FAILED!" -ForegroundColor Red
+            Write-Host "========================================" -ForegroundColor Red
+            Write-Host "Exit Code: $($res.ExitCode)" -ForegroundColor Red
+            if ($res.StdErr) {
+                Write-Host "Error output: $($res.StdErr)" -ForegroundColor Red
+            }
+            Write-Host "========================================" -ForegroundColor Red
+            
+            $errorMsg = "Encryption failed!`n`n"
+            if ($res.StdErr) {
+                $errorMsg += "Error: $($res.StdErr)`n"
+            }
+            $errorMsg += "`nExit Code: $($res.ExitCode)"
+            if (-not $outputExists) {
+                $errorMsg += "`n`nOutput file was not created."
+            } elseif ($outputSize -eq 0) {
+                $errorMsg += "`n`nOutput file was created but is empty (0 bytes)."
+            }
+            
+            [System.Windows.Forms.MessageBox]::Show($errorMsg, "Encryption Failed", "OK", "Error")
+        }
+        
+    } catch {
+        Write-Host "`n========================================" -ForegroundColor Red
+        Write-Host "EXCEPTION CAUGHT:" -ForegroundColor Red
+        Write-Host "========================================" -ForegroundColor Red
+        Write-Host "Message: $($_.Exception.Message)" -ForegroundColor Red
+        Write-Host "Stack: $($_.ScriptStackTrace)" -ForegroundColor Red
+        Write-Host "========================================" -ForegroundColor Red
+        
+        $script:encLblStatus.Text = "Error: $($_.Exception.Message)"
+        [System.Windows.Forms.MessageBox]::Show("Error during encryption: $($_.Exception.Message)`n`nCheck console for details.", "Error", "OK", "Error")
+    } finally {
+        Hide-WorkingDialog
+        Set-UIBusy $false
+        $script:encBtnEncrypt.Text = "ENCRYPT PDF (AES-256)"
+        $script:encBtnEncrypt.Enabled = $true
+        [System.Windows.Forms.Application]::DoEvents()
+    }
+}
 
-# Initialize
-UpdateStats
-UpdateStatus "QPDF ULTRA FAST - Merges in milliseconds!"
+# ============================================================
+# PDF ENCRYPTION TAB - AES-256 PROTECTION
+# ============================================================
+
+function Create-EncryptionTab {
+    $encTab = New-Object System.Windows.Forms.TabPage
+    $encTab.Text = "PDF Encryption"
+    $encTab.BackColor = [System.Drawing.Color]::FromArgb(240, 242, 245)
+    
+    # INPUT SECTION
+    $encInputGroup = New-Object System.Windows.Forms.GroupBox
+    $encInputGroup.Text = "Input PDF File"
+    $encInputGroup.Location = New-Object System.Drawing.Point(10, 10)
+    $encInputGroup.Size = New-Object System.Drawing.Size(760, 80)
+    $encInputGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    
+    $txtEncInput = New-Object System.Windows.Forms.TextBox
+    $txtEncInput.Name = "txtEncInput"
+    $txtEncInput.Location = New-Object System.Drawing.Point(10, 30)
+    $txtEncInput.Size = New-Object System.Drawing.Size(660, 25)
+    $txtEncInput.ReadOnly = $true
+    $txtEncInput.BackColor = [System.Drawing.Color]::White
+    $txtEncInput.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $encInputGroup.Controls.Add($txtEncInput)
+    
+    $btnEncBrowse = New-Object System.Windows.Forms.Button
+    $btnEncBrowse.Text = "Browse..."
+    $btnEncBrowse.Location = New-Object System.Drawing.Point(680, 28)
+    $btnEncBrowse.Size = New-Object System.Drawing.Size(70, 28)
+    $btnEncBrowse.BackColor = [System.Drawing.Color]::FromArgb(52, 152, 219)
+    $btnEncBrowse.ForeColor = [System.Drawing.Color]::White
+    $btnEncBrowse.FlatStyle = "Flat"
+    $encInputGroup.Controls.Add($btnEncBrowse)
+    
+    $encTab.Controls.Add($encInputGroup)
+    
+    # PASSWORD SECTION
+    $encPassGroup = New-Object System.Windows.Forms.GroupBox
+    $encPassGroup.Text = "Password Settings"
+    $encPassGroup.Location = New-Object System.Drawing.Point(10, 100)
+    $encPassGroup.Size = New-Object System.Drawing.Size(760, 150)
+    $encPassGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    
+    # User Password Row
+    $lblUserPass = New-Object System.Windows.Forms.Label
+    $lblUserPass.Text = "User Password (to open):"
+    $lblUserPass.Location = New-Object System.Drawing.Point(10, 30)
+    $lblUserPass.Size = New-Object System.Drawing.Size(160, 25)
+    $lblUserPass.TextAlign = "MiddleRight"
+    $lblUserPass.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $encPassGroup.Controls.Add($lblUserPass)
+    
+    $txtUserPass = New-Object System.Windows.Forms.TextBox
+    $txtUserPass.Name = "txtUserPass"
+    $txtUserPass.Location = New-Object System.Drawing.Point(175, 28)
+    $txtUserPass.Size = New-Object System.Drawing.Size(280, 25)
+    $txtUserPass.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $txtUserPass.PasswordChar = '*'
+    $encPassGroup.Controls.Add($txtUserPass)
+    
+    $chkShowUserPass = New-Object System.Windows.Forms.CheckBox
+    $chkShowUserPass.Text = "Show"
+    $chkShowUserPass.Location = New-Object System.Drawing.Point(465, 30)
+    $chkShowUserPass.Size = New-Object System.Drawing.Size(55, 20)
+    $chkShowUserPass.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $chkShowUserPass.Add_CheckedChanged({
+        try {
+            if ($this.Checked) {
+                $script:encTxtUserPass.PasswordChar = [char]0
+            } else {
+                $script:encTxtUserPass.PasswordChar = '*'
+            }
+        } catch {
+            Write-Host "Error toggling user password visibility: $($_.Exception.Message)" -ForegroundColor Red
+        }
+    })
+    $encPassGroup.Controls.Add($chkShowUserPass)
+    
+    # Owner Password Row
+    $lblOwnerPass = New-Object System.Windows.Forms.Label
+    $lblOwnerPass.Text = "Owner Password:"
+    $lblOwnerPass.Location = New-Object System.Drawing.Point(10, 65)
+    $lblOwnerPass.Size = New-Object System.Drawing.Size(160, 25)
+    $lblOwnerPass.TextAlign = "MiddleRight"
+    $lblOwnerPass.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $encPassGroup.Controls.Add($lblOwnerPass)
+    
+    $txtOwnerPass = New-Object System.Windows.Forms.TextBox
+    $txtOwnerPass.Name = "txtOwnerPass"
+    $txtOwnerPass.Location = New-Object System.Drawing.Point(175, 63)
+    $txtOwnerPass.Size = New-Object System.Drawing.Size(280, 25)
+    $txtOwnerPass.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $txtOwnerPass.PasswordChar = '*'
+    $encPassGroup.Controls.Add($txtOwnerPass)
+    
+    $chkShowOwnerPass = New-Object System.Windows.Forms.CheckBox
+    $chkShowOwnerPass.Text = "Show"
+    $chkShowOwnerPass.Location = New-Object System.Drawing.Point(465, 65)
+    $chkShowOwnerPass.Size = New-Object System.Drawing.Size(55, 20)
+    $chkShowOwnerPass.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $chkShowOwnerPass.Add_CheckedChanged({
+        try {
+            if ($this.Checked) {
+                $script:encTxtOwnerPass.PasswordChar = [char]0
+            } else {
+                $script:encTxtOwnerPass.PasswordChar = '*'
+            }
+        } catch {
+            Write-Host "Error toggling owner password visibility: $($_.Exception.Message)" -ForegroundColor Red
+        }
+    })
+    $encPassGroup.Controls.Add($chkShowOwnerPass)
+    
+    $lblEncNote = New-Object System.Windows.Forms.Label
+    $lblEncNote.Text = "Note: User password = required to open the file. Owner password = required to change permissions."
+    $lblEncNote.Location = New-Object System.Drawing.Point(10, 100)
+    $lblEncNote.Size = New-Object System.Drawing.Size(740, 30)
+    $lblEncNote.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $lblEncNote.ForeColor = [System.Drawing.Color]::Gray
+    $encPassGroup.Controls.Add($lblEncNote)
+    
+    $encTab.Controls.Add($encPassGroup)
+    
+    # DESTINATION SECTION
+    $encDestGroup = New-Object System.Windows.Forms.GroupBox
+    $encDestGroup.Text = "Destination (Encrypted PDF)"
+    $encDestGroup.Location = New-Object System.Drawing.Point(10, 260)
+    $encDestGroup.Size = New-Object System.Drawing.Size(760, 70)
+    $encDestGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    
+    $txtEncDest = New-Object System.Windows.Forms.TextBox
+    $txtEncDest.Name = "txtEncDest"
+    $txtEncDest.Location = New-Object System.Drawing.Point(10, 30)
+    $txtEncDest.Size = New-Object System.Drawing.Size(660, 25)
+    $txtEncDest.ReadOnly = $true
+    $txtEncDest.BackColor = [System.Drawing.Color]::White
+    $txtEncDest.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $txtEncDest.Text = [System.Environment]::GetFolderPath("Desktop")
+    $encDestGroup.Controls.Add($txtEncDest)
+    
+    $btnEncDest = New-Object System.Windows.Forms.Button
+    $btnEncDest.Text = "Browse..."
+    $btnEncDest.Location = New-Object System.Drawing.Point(680, 28)
+    $btnEncDest.Size = New-Object System.Drawing.Size(70, 28)
+    $btnEncDest.BackColor = [System.Drawing.Color]::FromArgb(52, 152, 219)
+    $btnEncDest.ForeColor = [System.Drawing.Color]::White
+    $btnEncDest.FlatStyle = "Flat"
+    $encDestGroup.Controls.Add($btnEncDest)
+    
+    $encTab.Controls.Add($encDestGroup)
+    
+    # ACTION BUTTON
+    $btnEncrypt = New-Object System.Windows.Forms.Button
+    $btnEncrypt.Text = "ENCRYPT PDF (AES-256)"
+    $btnEncrypt.Location = New-Object System.Drawing.Point(10, 350)
+    $btnEncrypt.Size = New-Object System.Drawing.Size(760, 50)
+    $btnEncrypt.BackColor = [System.Drawing.Color]::FromArgb(231, 76, 60)
+    $btnEncrypt.ForeColor = [System.Drawing.Color]::White
+    $btnEncrypt.Font = New-Object System.Drawing.Font("Segoe UI", 12, [System.Drawing.FontStyle]::Bold)
+    $btnEncrypt.FlatStyle = "Flat"
+    $btnEncrypt.Enabled = $false
+    $encTab.Controls.Add($btnEncrypt)
+    
+    # STATUS
+    $lblEncStatus = New-Object System.Windows.Forms.Label
+    $lblEncStatus.Text = "Ready"
+    $lblEncStatus.Location = New-Object System.Drawing.Point(10, 410)
+    $lblEncStatus.Size = New-Object System.Drawing.Size(760, 30)
+    $lblEncStatus.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $lblEncStatus.ForeColor = [System.Drawing.Color]::Gray
+    $lblEncStatus.TextAlign = "MiddleLeft"
+    $encTab.Controls.Add($lblEncStatus)
+    
+    # Store controls in script scope
+    $script:encTxtInput = $txtEncInput
+    $script:encTxtDest = $txtEncDest
+    $script:encBtnEncrypt = $btnEncrypt
+    $script:encLblStatus = $lblEncStatus
+    $script:encTxtUserPass = $txtUserPass
+    $script:encTxtOwnerPass = $txtOwnerPass
+    
+    # EVENT HANDLERS
+    $btnEncBrowse.Add_Click({
+        $ofd = New-Object System.Windows.Forms.OpenFileDialog
+        $ofd.Filter = "PDF Files|*.pdf"
+        $ofd.Title = "Select PDF to encrypt"
+        if ($ofd.ShowDialog() -eq "OK") {
+            $script:encTxtInput.Text = $ofd.FileName
+            $script:encTxtInput.ForeColor = [System.Drawing.Color]::Black
+            $script:encBtnEncrypt.Enabled = $true
+            
+            $baseName = [System.IO.Path]::GetFileNameWithoutExtension($ofd.FileName)
+            $destFileName = "$baseName`_encrypted.pdf"
+            $script:encTxtDest.Text = [System.IO.Path]::Combine([System.Environment]::GetFolderPath("Desktop"), $destFileName)
+        }
+    })
+    
+    $btnEncDest.Add_Click({
+        $sfd = New-Object System.Windows.Forms.SaveFileDialog
+        $sfd.Filter = "PDF Files|*.pdf"
+        $sfd.FileName = "encrypted.pdf"
+        if ($sfd.ShowDialog() -eq "OK") {
+            $script:encTxtDest.Text = $sfd.FileName
+        }
+    })
+    
+    $btnEncrypt.Add_Click({
+        try {
+            if ([string]::IsNullOrWhiteSpace($script:encTxtInput.Text) -or -not (Test-Path $script:encTxtInput.Text)) {
+                [System.Windows.Forms.MessageBox]::Show("Please select a valid PDF file.", "Error", "OK", "Error")
+                return
+            }
+            
+            if ([string]::IsNullOrWhiteSpace($script:encTxtDest.Text)) {
+                [System.Windows.Forms.MessageBox]::Show("Please specify an output file.", "Error", "OK", "Error")
+                return
+            }
+            
+            $userPass = $script:encTxtUserPass.Text
+            $ownerPass = $script:encTxtOwnerPass.Text
+            
+            if ([string]::IsNullOrWhiteSpace($userPass) -and [string]::IsNullOrWhiteSpace($ownerPass)) {
+                [System.Windows.Forms.MessageBox]::Show("Please enter at least one password.", "Error", "OK", "Error")
+                return
+            }
+            
+            Encrypt_PerformEncryption $script:encTxtInput.Text $script:encTxtDest.Text $userPass $ownerPass
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error: $($_.Exception.Message)", "Error", "OK", "Error")
+        }
+    })
+    
+    return $encTab
+}
+
+# ============================================================
+# BUILD MERGE UI
+# ============================================================
+
+function Build-MergeUI {
+    param($parentControl)
+    
+    # Store parent control in script scope
+    $script:mergeParentControl = $parentControl
+    
+    # Define UpdateStats as a script-level function
+    $script:UpdateStats = {
+        if ($script:listBox.Items.Count -gt 0) {
+            $totalSize = 0
+            $valid = 0
+            foreach ($file in $script:listBox.Items) {
+                if (Test-Path $file) {
+                    $totalSize += (Get-ChildItem $file).Length
+                    $valid++
+                }
+            }
+            $sizeMB = [math]::Round($totalSize / 1MB, 2)
+            $script:lblStats.Text = "Files: $valid`r`nTotal Size: $sizeMB MB`r`nOrder: Top to Bottom"
+            $script:btnMerge.Enabled = ($valid -ge 2)
+        } else {
+            $script:lblStats.Text = "No files loaded"
+            $script:btnMerge.Enabled = $false
+        }
+    }
+    
+    # Top button bar
+    $buttonBar = New-Object System.Windows.Forms.Panel
+    $buttonBar.Dock = "Top"
+    $buttonBar.Height = 55
+    $buttonBar.BackColor = [System.Drawing.Color]::FromArgb(52, 73, 94)
+    
+    $btnAdd = New-Object System.Windows.Forms.Button
+    $btnAdd.Text = "Add PDFs"
+    $btnAdd.Location = New-Object System.Drawing.Point(10, 10)
+    $btnAdd.Size = New-Object System.Drawing.Size(100, 40)
+    $btnAdd.BackColor = [System.Drawing.Color]::FromArgb(46, 204, 113)
+    $btnAdd.ForeColor = [System.Drawing.Color]::White
+    $btnAdd.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    $btnAdd.FlatStyle = "Flat"
+    $buttonBar.Controls.Add($btnAdd)
+    $script:btnAdd = $btnAdd
+    
+    $btnAddFolder = New-Object System.Windows.Forms.Button
+    $btnAddFolder.Text = "Add Folder"
+    $btnAddFolder.Location = New-Object System.Drawing.Point(120, 10)
+    $btnAddFolder.Size = New-Object System.Drawing.Size(100, 40)
+    $btnAddFolder.BackColor = [System.Drawing.Color]::FromArgb(52, 152, 219)
+    $btnAddFolder.ForeColor = [System.Drawing.Color]::White
+    $btnAddFolder.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    $btnAddFolder.FlatStyle = "Flat"
+    $buttonBar.Controls.Add($btnAddFolder)
+    $script:btnAddFolder = $btnAddFolder
+    
+    $btnMerge = New-Object System.Windows.Forms.Button
+    $btnMerge.Text = "INSTANT MERGE"
+    $btnMerge.Location = New-Object System.Drawing.Point(230, 10)
+    $btnMerge.Size = New-Object System.Drawing.Size(140, 40)
+    $btnMerge.BackColor = [System.Drawing.Color]::FromArgb(155, 89, 182)
+    $btnMerge.ForeColor = [System.Drawing.Color]::White
+    $btnMerge.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    $btnMerge.FlatStyle = "Flat"
+    $btnMerge.Enabled = $false
+    $buttonBar.Controls.Add($btnMerge)
+    $script:btnMerge = $btnMerge
+    
+    $btnCompress = New-Object System.Windows.Forms.Button
+    $btnCompress.Text = "SMART COMPRESS"
+    $btnCompress.Location = New-Object System.Drawing.Point(380, 10)
+    $btnCompress.Size = New-Object System.Drawing.Size(180, 40)
+    $btnCompress.BackColor = [System.Drawing.Color]::FromArgb(230, 126, 34)
+    $btnCompress.ForeColor = [System.Drawing.Color]::White
+    $btnCompress.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    $btnCompress.FlatStyle = "Flat"
+    $buttonBar.Controls.Add($btnCompress)
+    $script:btnCompress = $btnCompress
+    
+    $btnRemove = New-Object System.Windows.Forms.Button
+    $btnRemove.Text = "Remove"
+    $btnRemove.Location = New-Object System.Drawing.Point(570, 10)
+    $btnRemove.Size = New-Object System.Drawing.Size(100, 40)
+    $btnRemove.BackColor = [System.Drawing.Color]::FromArgb(231, 76, 60)
+    $btnRemove.ForeColor = [System.Drawing.Color]::White
+    $btnRemove.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    $btnRemove.FlatStyle = "Flat"
+    $buttonBar.Controls.Add($btnRemove)
+    $script:btnRemove = $btnRemove
+    
+    $btnClear = New-Object System.Windows.Forms.Button
+    $btnClear.Text = "Clear All"
+    $btnClear.Location = New-Object System.Drawing.Point(680, 10)
+    $btnClear.Size = New-Object System.Drawing.Size(100, 40)
+    $btnClear.BackColor = [System.Drawing.Color]::FromArgb(149, 165, 166)
+    $btnClear.ForeColor = [System.Drawing.Color]::White
+    $btnClear.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    $btnClear.FlatStyle = "Flat"
+    $buttonBar.Controls.Add($btnClear)
+    $script:btnClear = $btnClear
+    
+    $btnAbout = New-Object System.Windows.Forms.Button
+    $btnAbout.Text = "About"
+    $btnAbout.Location = New-Object System.Drawing.Point(790, 10)
+    $btnAbout.Size = New-Object System.Drawing.Size(100, 40)
+    $btnAbout.BackColor = [System.Drawing.Color]::FromArgb(241, 196, 15)
+    $btnAbout.ForeColor = [System.Drawing.Color]::White
+    $btnAbout.Font = New-Object System.Drawing.Font("Segoe UI", 10, [System.Drawing.FontStyle]::Bold)
+    $btnAbout.FlatStyle = "Flat"
+    $buttonBar.Controls.Add($btnAbout)
+    $script:btnAbout = $btnAbout
+    
+    $parentControl.Controls.Add($buttonBar)
+    
+    # LEFT PANEL - FILE LIST
+    $leftGroup = New-Object System.Windows.Forms.GroupBox
+    $leftGroup.Text = "PDF Files (Top to Bottom = Merge Order)"
+    $leftGroup.Location = New-Object System.Drawing.Point(12, 65)
+    $leftGroup.Size = New-Object System.Drawing.Size(500, 630)
+    $leftGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    
+    $listBox = New-Object System.Windows.Forms.ListBox
+    $listBox.Location = New-Object System.Drawing.Point(10, 25)
+    $listBox.Size = New-Object System.Drawing.Size(480, 560)
+    $listBox.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $listBox.SelectionMode = "MultiExtended"
+    $listBox.ScrollAlwaysVisible = $true
+    $listBox.HorizontalScrollbar = $true
+    $listBox.AllowDrop = $true
+    $leftGroup.Controls.Add($listBox)
+    $script:listBox = $listBox
+    
+    # Move Up/Down buttons
+    $moveUp = New-Object System.Windows.Forms.Button
+    $moveUp.Text = "Move Up"
+    $moveUp.Location = New-Object System.Drawing.Point(10, 590)
+    $moveUp.Size = New-Object System.Drawing.Size(230, 30)
+    $moveUp.BackColor = [System.Drawing.Color]::FromArgb(52, 73, 94)
+    $moveUp.ForeColor = [System.Drawing.Color]::White
+    $moveUp.FlatStyle = "Flat"
+    $leftGroup.Controls.Add($moveUp)
+    
+    $moveDown = New-Object System.Windows.Forms.Button
+    $moveDown.Text = "Move Down"
+    $moveDown.Location = New-Object System.Drawing.Point(250, 590)
+    $moveDown.Size = New-Object System.Drawing.Size(240, 30)
+    $moveDown.BackColor = [System.Drawing.Color]::FromArgb(52, 73, 94)
+    $moveDown.ForeColor = [System.Drawing.Color]::White
+    $moveDown.FlatStyle = "Flat"
+    $leftGroup.Controls.Add($moveDown)
+    
+    $parentControl.Controls.Add($leftGroup)
+    
+    # RIGHT PANEL - PREVIEW
+    $rightGroup = New-Object System.Windows.Forms.GroupBox
+    $rightGroup.Text = "PDF Preview"
+    $rightGroup.Location = New-Object System.Drawing.Point(525, 65)
+    $rightGroup.Size = New-Object System.Drawing.Size(550, 320)
+    $rightGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    
+    $previewBox = New-Object System.Windows.Forms.PictureBox
+    $previewBox.Location = New-Object System.Drawing.Point(10, 25)
+    $previewBox.Size = New-Object System.Drawing.Size(530, 250)
+    $previewBox.SizeMode = "Zoom"
+    $previewBox.BackColor = [System.Drawing.Color]::LightGray
+    $previewBox.BorderStyle = "FixedSingle"
+    $rightGroup.Controls.Add($previewBox)
+    $script:previewBox = $previewBox
+    
+    $previewStatus = New-Object System.Windows.Forms.Label
+    $previewStatus.Text = "Click a file to preview"
+    $previewStatus.Location = New-Object System.Drawing.Point(10, 285)
+    $previewStatus.Size = New-Object System.Drawing.Size(530, 25)
+    $previewStatus.TextAlign = "MiddleCenter"
+    $previewStatus.Font = New-Object System.Drawing.Font("Segoe UI", 9)
+    $previewStatus.ForeColor = [System.Drawing.Color]::Gray
+    $rightGroup.Controls.Add($previewStatus)
+    $script:previewStatus = $previewStatus
+    
+    $parentControl.Controls.Add($rightGroup)
+    
+    # BOTTOM RIGHT PANEL - CONTROLS
+    $controlsGroup = New-Object System.Windows.Forms.GroupBox
+    $controlsGroup.Text = "Settings"
+    $controlsGroup.Location = New-Object System.Drawing.Point(525, 395)
+    $controlsGroup.Size = New-Object System.Drawing.Size(550, 330)
+    $controlsGroup.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    
+    $y = 30
+    
+    $chkCompress = New-Object System.Windows.Forms.CheckBox
+    $chkCompress.Text = "Compress after merge"
+    $chkCompress.Location = New-Object System.Drawing.Point(15, $y)
+    $chkCompress.Size = New-Object System.Drawing.Size(200, 25)
+    $controlsGroup.Controls.Add($chkCompress)
+    $script:chkCompress = $chkCompress
+    $y += 35
+    
+    $lblMethod = New-Object System.Windows.Forms.Label
+    $lblMethod.Text = "Compression Method:"
+    $lblMethod.Location = New-Object System.Drawing.Point(15, $y)
+    $lblMethod.Size = New-Object System.Drawing.Size(170, 25)
+    $controlsGroup.Controls.Add($lblMethod)
+    
+    $cmbMethod = New-Object System.Windows.Forms.ComboBox
+    $cmbMethod.Location = New-Object System.Drawing.Point(185, $y)
+    $cmbMethod.Size = New-Object System.Drawing.Size(280, 25)
+    $cmbMethod.DropDownStyle = "DropDownList"
+    $cmbMethod.Items.AddRange(@(
+        "Smart Auto (Recommended - Detects Text/Images)",
+        "Image Optimized (Aggressive - 40-50% Quality)",
+        "Method 1: Ghostscript Font Subset (90%+)",
+        "Balanced (Text + Images)",
+        "Method 4: Rebuild from Text",
+        "Method 5: Maximal + PDFtk Strip"
+    ))
+    $cmbMethod.SelectedIndex = 0
+    $controlsGroup.Controls.Add($cmbMethod)
+    $script:cmbMethod = $cmbMethod
+    $y += 35
+    
+    $lblQuality = New-Object System.Windows.Forms.Label
+    $lblQuality.Name = "lblQuality"
+    $lblQuality.Text = "Image Quality: 45%"
+    $lblQuality.Location = New-Object System.Drawing.Point(15, $y)
+    $lblQuality.Size = New-Object System.Drawing.Size(120, 25)
+    $controlsGroup.Controls.Add($lblQuality)
+    $script:lblQuality = $lblQuality
+    
+    $trackQuality = New-Object System.Windows.Forms.TrackBar
+    $trackQuality.Name = "trackQuality"
+    $trackQuality.Location = New-Object System.Drawing.Point(135, $y)
+    $trackQuality.Size = New-Object System.Drawing.Size(200, 45)
+    $trackQuality.Minimum = 10
+    $trackQuality.Maximum = 80
+    $trackQuality.TickFrequency = 5
+    $trackQuality.Value = 45
+    $trackQuality.Add_ValueChanged({
+        $script:lblQuality.Text = "Image Quality: $($this.Value)%"
+    })
+    $controlsGroup.Controls.Add($trackQuality)
+    $script:trackQuality = $trackQuality
+    
+    $lblQualityNote = New-Object System.Windows.Forms.Label
+    $lblQualityNote.Location = New-Object System.Drawing.Point(135, ($y + 45))
+    $lblQualityNote.Size = New-Object System.Drawing.Size(300, 20)
+    $lblQualityNote.Text = "Lower = smaller file, more compression"
+    $lblQualityNote.Font = New-Object System.Drawing.Font("Segoe UI", 8)
+    $lblQualityNote.ForeColor = [System.Drawing.Color]::Gray
+    $controlsGroup.Controls.Add($lblQualityNote)
+    $y += 65
+    
+    $lblVersion = New-Object System.Windows.Forms.Label
+    $lblVersion.Text = "PDF Version:"
+    $lblVersion.Location = New-Object System.Drawing.Point(15, $y)
+    $lblVersion.Size = New-Object System.Drawing.Size(80, 25)
+    $controlsGroup.Controls.Add($lblVersion)
+    
+    $cmbVersion = New-Object System.Windows.Forms.ComboBox
+    $cmbVersion.Location = New-Object System.Drawing.Point(100, $y)
+    $cmbVersion.Size = New-Object System.Drawing.Size(80, 25)
+    $cmbVersion.DropDownStyle = "DropDownList"
+    $cmbVersion.Items.AddRange(@("1.4", "1.5", "1.6", "1.7"))
+    $cmbVersion.SelectedIndex = 1
+    $controlsGroup.Controls.Add($cmbVersion)
+    $script:cmbVersion = $cmbVersion
+    $y += 45
+    
+    $statsBox = New-Object System.Windows.Forms.GroupBox
+    $statsBox.Text = "Statistics"
+    $statsBox.Location = New-Object System.Drawing.Point(15, $y)
+    $statsBox.Size = New-Object System.Drawing.Size(520, 80)
+    $controlsGroup.Controls.Add($statsBox)
+    
+    $lblStats = New-Object System.Windows.Forms.Label
+    $lblStats.Text = "No files loaded"
+    $lblStats.Location = New-Object System.Drawing.Point(10, 20)
+    $lblStats.Size = New-Object System.Drawing.Size(500, 50)
+    $statsBox.Controls.Add($lblStats)
+    $script:lblStats = $lblStats
+    
+    $parentControl.Controls.Add($controlsGroup)
+    
+    # ============= Define AddFilesToList as a script-level function =============
+    $script:AddFilesToList = {
+        param($filePaths)
+        $addedAny = $false
+        $addedCount = 0
+        foreach ($p in $filePaths) {
+            if ([string]::IsNullOrWhiteSpace($p)) { continue }
+            $cleanPath = [regex]::Replace($p, '[^\x20-\x7E]', '').Trim().Trim('"').Trim("'")
+            if ($cleanPath -eq "" -and $p.Trim() -ne "") {
+                $cleanPath = $p.Trim().Trim('"').Trim("'").Trim([char]0xFEFF)
+            }
+            if ($cleanPath -ne "" -and (Test-Path -LiteralPath $cleanPath)) {
+                if (-not $script:listBox.Items.Contains($cleanPath)) {
+                    [void]$script:listBox.Items.Add($cleanPath)
+                    $addedAny = $true
+                    $addedCount++
+                }
+            }
+        }
+        if ($addedAny) { & $script:UpdateStats }
+        return $addedCount
+    }
+    
+    # ============= Context menu for listbox =============
+    $contextMenu = New-Object System.Windows.Forms.ContextMenuStrip
+    
+    $openFileItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $openFileItem.Text = "Open"
+    $openFileItem.Add_Click({
+        if ($script:listBox.SelectedIndex -ge 0) {
+            $filePath = $script:listBox.SelectedItem.ToString()
+            if (Test-Path -LiteralPath $filePath) {
+                try { Start-Process $filePath } catch { }
+            }
+        }
+    })
+    [void]$contextMenu.Items.Add($openFileItem)
+    [void]$contextMenu.Items.Add("-")
+    
+    $pasteItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $pasteItem.Text = "Paste Files / Paths (Ctrl+V)"
+    $pasteItem.Add_Click({
+        if ([System.Windows.Forms.Clipboard]::ContainsFileDropList()) {
+            $files = [System.Windows.Forms.Clipboard]::GetFileDropList()
+            & $script:AddFilesToList $files
+        } elseif ([System.Windows.Forms.Clipboard]::ContainsText()) {
+            $text = [System.Windows.Forms.Clipboard]::GetText()
+            $lines = $text -split "`r`n|`n"
+            & $script:AddFilesToList $lines
+        }
+    })
+    [void]$contextMenu.Items.Add($pasteItem)
+    
+    $copyItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $copyItem.Text = "Copy Selected Paths (Ctrl+C)"
+    $copyItem.Add_Click({
+        if ($script:listBox.SelectedItems.Count -gt 0) {
+            $copiedText = ($script:listBox.SelectedItems -join [Environment]::NewLine)
+            [System.Windows.Forms.Clipboard]::SetText($copiedText)
+        }
+    })
+    [void]$contextMenu.Items.Add($copyItem)
+    [void]$contextMenu.Items.Add("-")
+    
+    # ============= NEW: Import TXT File =============
+    $importTxtItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $importTxtItem.Text = "Import List from TXT File..."
+    $importTxtItem.Add_Click({
+        $ofd = New-Object System.Windows.Forms.OpenFileDialog
+        $ofd.Filter = "Text Files (*.txt)|*.txt|All Files (*.*)|*.*"
+        $ofd.Title = "Select TXT file containing PDF paths"
+        if ($ofd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            try {
+                $lines = Get-Content -LiteralPath $ofd.FileName -Encoding UTF8
+                # Filter to only include lines that contain .pdf or .PDF
+                $pdfLines = @()
+                foreach ($line in $lines) {
+                    if ($line -match "\.pdf$" -or $line -match "\.PDF$") {
+                        $pdfLines += $line
+                    }
+                }
+                if ($pdfLines.Count -gt 0) {
+                    $added = & $script:AddFilesToList $pdfLines
+                    [System.Windows.Forms.MessageBox]::Show("Imported $added file(s) from TXT file.", "Import Complete", "OK", "Information")
+                } else {
+                    [System.Windows.Forms.MessageBox]::Show("No PDF files found in the TXT file.", "Import Failed", "OK", "Warning")
+                }
+            } catch {
+                [System.Windows.Forms.MessageBox]::Show("Error importing file: $($_.Exception.Message)", "Error", "OK", "Error")
+            }
+        }
+    })
+    [void]$contextMenu.Items.Add($importTxtItem)
+    
+    # ============= NEW: Export TXT File =============
+    $exportTxtItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $exportTxtItem.Text = "Export List to TXT File..."
+    $exportTxtItem.Add_Click({
+        if ($script:listBox.Items.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show("No files to export.", "Export Failed", "OK", "Warning")
+            return
+        }
+        $sfd = New-Object System.Windows.Forms.SaveFileDialog
+        $sfd.Filter = "Text Files (*.txt)|*.txt"
+        $sfd.FileName = "pdf_file_list.txt"
+        if ($sfd.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
+            try {
+                $script:listBox.Items | Out-File -FilePath $sfd.FileName -Encoding UTF8
+                [System.Windows.Forms.MessageBox]::Show("Exported $($script:listBox.Items.Count) file(s) to TXT file.", "Export Complete", "OK", "Information")
+            } catch {
+                [System.Windows.Forms.MessageBox]::Show("Error exporting file: $($_.Exception.Message)", "Error", "OK", "Error")
+            }
+        }
+    })
+    [void]$contextMenu.Items.Add($exportTxtItem)
+    [void]$contextMenu.Items.Add("-")
+    
+    $removeSelectedItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $removeSelectedItem.Text = "Remove Selected"
+    $removeSelectedItem.Add_Click({
+        if ($script:listBox.SelectedIndices.Count -gt 0) {
+            $indices = @()
+            foreach ($idx in $script:listBox.SelectedIndices) { $indices += $idx }
+            foreach ($idx in ($indices | Sort-Object -Descending)) { $script:listBox.Items.RemoveAt($idx) }
+            & $script:UpdateStats
+        }
+    })
+    [void]$contextMenu.Items.Add($removeSelectedItem)
+    
+    $removeAllItem = New-Object System.Windows.Forms.ToolStripMenuItem
+    $removeAllItem.Text = "Clear All"
+    $removeAllItem.Add_Click({
+        if ($script:listBox.Items.Count -gt 0 -and [System.Windows.Forms.MessageBox]::Show("Clear all files?", "Confirm", "YesNo", "Question") -eq "Yes") {
+            $script:listBox.Items.Clear()
+            if ($script:previewBox) { $script:previewBox.Image = $null }
+            if ($script:previewStatus) { $script:previewStatus.Text = "Click a file to preview" }
+            & $script:UpdateStats
+        }
+    })
+    [void]$contextMenu.Items.Add($removeAllItem)
+    
+    $listBox.ContextMenuStrip = $contextMenu
+    
+    # Event handlers
+    $listBox.Add_DragEnter({
+        param($sender, $e)
+        if ($e.Data.GetDataPresent([System.Windows.Forms.DataFormats]::FileDrop)) {
+            $e.Effect = [System.Windows.Forms.DragDropEffects]::Copy
+        }
+    })
+    
+    $listBox.Add_DragDrop({
+        param($sender, $e)
+        if ($e.Data.GetDataPresent([System.Windows.Forms.DataFormats]::FileDrop)) {
+            $droppedFiles = $e.Data.GetData([System.Windows.Forms.DataFormats]::FileDrop)
+            & $script:AddFilesToList $droppedFiles
+        }
+    })
+    
+    $listBox.Add_KeyDown({
+        param($sender, $e)
+        if ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::V) {
+            if ([System.Windows.Forms.Clipboard]::ContainsFileDropList()) {
+                $files = [System.Windows.Forms.Clipboard]::GetFileDropList()
+                & $script:AddFilesToList $files
+            } elseif ([System.Windows.Forms.Clipboard]::ContainsText()) {
+                $text = [System.Windows.Forms.Clipboard]::GetText()
+                $lines = $text -split "`r`n|`n"
+                & $script:AddFilesToList $lines
+            }
+        } elseif ($e.Control -and $e.KeyCode -eq [System.Windows.Forms.Keys]::C) {
+            if ($script:listBox.SelectedItems.Count -gt 0) {
+                $copiedText = ($script:listBox.SelectedItems -join [Environment]::NewLine)
+                [System.Windows.Forms.Clipboard]::SetText($copiedText)
+            }
+        } elseif ($e.KeyCode -eq [System.Windows.Forms.Keys]::Delete) {
+            if ($script:listBox.SelectedIndices.Count -gt 0) {
+                $indices = @($script:listBox.SelectedIndices)
+                foreach ($idx in ($indices | Sort-Object -Descending)) {
+                    $script:listBox.Items.RemoveAt($idx)
+                }
+                & $script:UpdateStats
+            }
+        }
+    })
+    
+    $btnAdd.Add_Click({
+        $ofd = New-Object System.Windows.Forms.OpenFileDialog
+        $ofd.Filter = "PDF Files|*.pdf"
+        $ofd.Multiselect = $true
+        if ($ofd.ShowDialog() -eq "OK") {
+            $added = 0
+            foreach ($f in $ofd.FileNames) {
+                if (-not $script:listBox.Items.Contains($f)) { $script:listBox.Items.Add($f); $added++ }
+            }
+            & $script:UpdateStats
+        }
+    })
+    
+    $btnAddFolder.Add_Click({
+        $fbd = New-Object System.Windows.Forms.FolderBrowserDialog
+        if ($fbd.ShowDialog() -eq "OK") {
+            $files = Get-ChildItem $fbd.SelectedPath -Filter "*.pdf" -File
+            $added = 0
+            foreach ($f in $files) {
+                if (-not $script:listBox.Items.Contains($f.FullName)) { $script:listBox.Items.Add($f.FullName); $added++ }
+            }
+            & $script:UpdateStats
+        }
+    })
+    
+    $btnRemove.Add_Click({
+        if ($script:listBox.SelectedIndices.Count -eq 0) {
+            [System.Windows.Forms.MessageBox]::Show("Select files to remove", "Info", "OK", "Information") | Out-Null
+            return
+        }
+        $indices = @()
+        foreach ($idx in $script:listBox.SelectedIndices) { $indices += $idx }
+        foreach ($idx in ($indices | Sort-Object -Descending)) { $script:listBox.Items.RemoveAt($idx) }
+        & $script:UpdateStats
+    })
+    
+    $btnClear.Add_Click({
+        if ($script:listBox.Items.Count -gt 0) {
+            if ([System.Windows.Forms.MessageBox]::Show("Clear all files?", "Confirm", "YesNo", "Question") -eq "Yes") {
+                $script:listBox.Items.Clear()
+                if ($script:previewBox) { $script:previewBox.Image = $null }
+                if ($script:previewStatus) { $script:previewStatus.Text = "Click a file to preview" }
+                & $script:UpdateStats
+            }
+        }
+    })
+    
+    $moveUp.Add_Click({
+        $idx = $script:listBox.SelectedIndex
+        if ($idx -gt 0) {
+            $item = $script:listBox.Items[$idx]
+            $script:listBox.Items.RemoveAt($idx)
+            $script:listBox.Items.Insert($idx - 1, $item)
+            $script:listBox.SetSelected($idx - 1, $true)
+            & $script:UpdateStats
+        }
+    })
+    
+    $moveDown.Add_Click({
+        $idx = $script:listBox.SelectedIndex
+        if ($idx -ge 0 -and $idx -lt ($script:listBox.Items.Count - 1)) {
+            $item = $script:listBox.Items[$idx]
+            $script:listBox.Items.RemoveAt($idx)
+            $script:listBox.Items.Insert($idx + 1, $item)
+            $script:listBox.SetSelected($idx + 1, $true)
+            & $script:UpdateStats
+        }
+    })
+    
+    $listBox.Add_SelectedIndexChanged({
+        if ($script:listBox.SelectedIndex -ge 0) {
+            $file = $script:listBox.SelectedItem.ToString()
+            if (Test-Path $file) {
+                if ($script:previewStatus) { $script:previewStatus.Text = "Loading preview..." }
+                if ($script:mergeParentControl) { $script:mergeParentControl.Refresh() }
+                $tempImg = [System.IO.Path]::GetTempFileName() + ".png"
+                $args = "-q -dNOPAUSE -dBATCH -sDEVICE=png16m -dFirstPage=1 -dLastPage=1 -r100 -sOutputFile=`"$tempImg`" `"$file`""
+                $res = Invoke-External -FileName $script:gs -Arguments $args
+                if ((Test-Path $tempImg)) {
+                    if ($script:previewBox) { 
+                        if ($script:previewBox.Image) { $script:previewBox.Image.Dispose() }
+                        $script:previewBox.Image = [System.Drawing.Image]::FromFile($tempImg)
+                    }
+                    if ($script:previewStatus) { $script:previewStatus.Text = "Preview loaded" }
+                    Start-Sleep -Milliseconds 200
+                    Remove-Item $tempImg -Force -ErrorAction SilentlyContinue
+                } else {
+                    if ($script:previewBox) { $script:previewBox.Image = $null }
+                    if ($script:previewStatus) { $script:previewStatus.Text = "Cannot preview" }
+                }
+            }
+        }
+    })
+    
+    $btnMerge.Add_Click({
+        if ($script:listBox.Items.Count -lt 2) {
+            [System.Windows.Forms.MessageBox]::Show("Add at least 2 PDF files to merge", "Error", "OK", "Error") | Out-Null
+            return
+        }
+        $sfd = New-Object System.Windows.Forms.SaveFileDialog
+        $sfd.Filter = "PDF Files|*.pdf"
+        $sfd.FileName = "Merged_$(Get-Date -Format 'yyyyMMdd_HHmmss').pdf"
+        if ($sfd.ShowDialog() -ne "OK") { return }
+        
+        $outPath = $sfd.FileName
+        $doCompress = $script:chkCompress.Checked
+        try {
+            Set-UIBusy $true
+            Show-WorkingDialog -Message "Working... Please wait (merging PDFs)..."
+            
+            $filesToMerge = @(); foreach ($item in $script:listBox.Items) { $filesToMerge += $item }
+            $startTime = Get-Date
+            $success = MergeFiles $filesToMerge $outPath
+            $elapsed = [math]::Round(((Get-Date) - $startTime).TotalSeconds, 2)
+            
+            if ($success) {
+                if ($doCompress) {
+                    Update-WorkingMessage "Working... Please wait (compressing result)..."
+                    $compressed = CompressFileSmart $outPath $outPath
+                    if ($compressed) {
+                        $size = [math]::Round((Get-ChildItem $outPath).Length / 1MB, 2)
+                        [System.Windows.Forms.MessageBox]::Show("Merge + Compression complete!`n`nFiles merged: $($filesToMerge.Count)`nSize: $size MB`nTime: ${elapsed}s", "Success", "OK", "Information") | Out-Null
+                    }
+                } else {
+                    $size = [math]::Round((Get-ChildItem $outPath).Length / 1MB, 2)
+                    [System.Windows.Forms.MessageBox]::Show("Merge complete!`n`nFiles merged: $($filesToMerge.Count)`nSize: $size MB`nTime: ${elapsed}s", "Success", "OK", "Information") | Out-Null
+                }
+                Open-FolderInExplorer $outPath
+            } else {
+                [System.Windows.Forms.MessageBox]::Show("Merge failed! Check console for details.", "Error", "OK", "Error") | Out-Null
+            }
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error during merge: $($_.Exception.Message)", "Error", "OK", "Error") | Out-Null
+        } finally {
+            Hide-WorkingDialog
+            Set-UIBusy $false
+        }
+    })
+    
+    $btnCompress.Add_Click({
+        $ofd = New-Object System.Windows.Forms.OpenFileDialog
+        $ofd.Filter = "PDF Files|*.pdf"
+        $ofd.Title = "Select PDF to compress"
+        if ($ofd.ShowDialog() -ne "OK") { return }
+        
+        $sfd = New-Object System.Windows.Forms.SaveFileDialog
+        $sfd.Filter = "PDF Files|*.pdf"
+        $sfd.FileName = "Compressed_$(Get-Date -Format 'yyyyMMdd_HHmmss').pdf"
+        if ($sfd.ShowDialog() -ne "OK") { return }
+        
+        try {
+            Set-UIBusy $true
+            Show-WorkingDialog -Message "Working... Please wait (analyzing & compressing)..."
+            $success = CompressFileSmart $ofd.FileName $sfd.FileName
+            if ($success) {
+                Open-FolderInExplorer $sfd.FileName
+            }
+        } catch {
+            [System.Windows.Forms.MessageBox]::Show("Error during compression: $($_.Exception.Message)", "Error", "OK", "Error") | Out-Null
+        } finally {
+            Hide-WorkingDialog
+            Set-UIBusy $false
+        }
+    })
+    
+    $btnAbout.Add_Click({ Show-AboutDialog })
+    
+    # Initialize stats
+    & $script:UpdateStats
+}
+
+
+
+
+
+
+
+# ============================================================
+# CREATE MAIN FORM WITH TABS
+# ============================================================
+
+function Create-MainFormWithTabs {
+    $form = New-Object System.Windows.Forms.Form
+    $form.Text = "Kerim's PDF Tools - QPDF ULTRA FAST V4"
+    $form.Size = New-Object System.Drawing.Size(1100, 780)
+    $form.StartPosition = "CenterScreen"
+    $form.BackColor = [System.Drawing.Color]::FromArgb(240, 242, 245)
+    
+    $script:mainForm = $form
+    
+    $tabControl = New-Object System.Windows.Forms.TabControl
+    $tabControl.Dock = "Fill"
+    $tabControl.Font = New-Object System.Drawing.Font("Segoe UI", 9, [System.Drawing.FontStyle]::Bold)
+    
+    # MERGE TAB
+    $mergeTab = New-Object System.Windows.Forms.TabPage
+    $mergeTab.Text = "PDF Merge"
+    $mergeTab.BackColor = [System.Drawing.Color]::FromArgb(240, 242, 245)
+    Build-MergeUI $mergeTab
+    $tabControl.TabPages.Add($mergeTab)
+    
+    # SPLIT TAB
+    $splitTab = Create-SplitTab
+    $tabControl.TabPages.Add($splitTab)
+    
+    # ENCRYPTION TAB
+    $encTab = Create-EncryptionTab
+    $tabControl.TabPages.Add($encTab)
+    
+    $form.Controls.Add($tabControl)
+    
+    # STATUS BAR
+    $statusBar = New-Object System.Windows.Forms.StatusStrip
+    $statusLabel = New-Object System.Windows.Forms.ToolStripStatusLabel
+    $statusLabel.Text = "QPDF ULTRA FAST - Merges in milliseconds!"
+    $statusLabel.Spring = $true
+    $statusBar.Items.Add($statusLabel) | Out-Null
+    $form.Controls.Add($statusBar)
+    
+    return $form
+}
+
+# ============================================================
+# MAIN ENTRY POINT
+# ============================================================
+
+# Create and show the main form with tabs
+$form = Create-MainFormWithTabs
 $form.ShowDialog() | Out-Null
