@@ -371,6 +371,386 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
+
+
+
+
+# Kerim's PDF Tools - QPDF ULTRA FAST V4
+
+[![Version](https://img.shields.io/badge/version-4.0-blue.svg)](https://github.com/yourusername/kerim-pdf-tools)
+[![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blueviolet.svg)](https://github.com/PowerShell/PowerShell)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Windows-lightgrey.svg)](https://www.microsoft.com/en-us/windows)
+
+> **Pulsuz, sürətli PDF birləşdirmə və sıxışdırma aləti. PDF fayllarını istənilən onlayn xidmətlərdən daha yaxşı birləşdirir və sıxışdırır.**
+
+---
+
+<img width="1063" height="752" alt="image" src="https://github.com/user-attachments/assets/3cc21681-bdd6-4fb9-a06c-c89e9d9f4052" />
+
+<img width="1224" height="653" alt="image" src="https://github.com/user-attachments/assets/031e792c-fa1b-46f9-977b-caffd5e8becb" />
+
+<img width="1063" height="752" alt="image" src="https://github.com/user-attachments/assets/966a5cdc-dfbd-49ed-b997-def997ec294b" />
+
+<img width="1086" height="768" alt="image" src="https://github.com/user-attachments/assets/bc058f81-238a-466b-bf74-2e8613a8b133" />
+
+
+## 📋 Mündəricat
+
+- [Sürətli Başlanğıc](#-sürətli-başlanğıc)
+- [Ümumi Baxış](#-ümumi-baxış)
+- [Əsas Xüsusiyyətlər](#-əsas-xüsusiyyətlər)
+- [UI/UX Xüsusiyyətləri](#-uiux-xüsusiyyətləri)
+- [Texniki Üstünlüklər](#-texniki-üstünlüklər)
+- [İstifadəçi Təcrübəsi Üstünlükləri](#-istifadəçi-təcrübəsi-üstünlükləri)
+- [İnnovativ Xüsusiyyətlər](#-innovativ-xüsusiyyətlər)
+- [İstifadə Halları](#-istifadə-halları)
+- [Performans Göstəriciləri](#-performans-göstəriciləri)
+- [Rəqabət Üstünlükləri](#-rəqabət-üstünlükləri)
+- [Gələcək Potensial](#-gələcək-potensial)
+- [Xülasə](#-xülasə)
+- [Əsas Satış Nöqtələri](#-əsas-satış-nöqtələri)
+
+---
+
+## 🚀 Sürətli Başlanğıc
+
+### Yüklə və İşə Sal
+
+1. **Son buraxılışı** [Releases](https://github.com/yourusername/kerim-pdf-tools/releases) bölməsindən yükləyin
+2. **Arxivi** İş masasına (və ya istənilən qovluğa) açın
+3. `Start.bat` faylını işə salın
+4. **GUI** açılacaq - Zövq alın! 🎉
+
+### Sistem Tələbləri
+
+- **ƏS**: Windows 10, Windows 11 (tam test edilib)
+- **Quraşdırma tələb olunmur** - Portativ proqram
+- **Admin hüquqları tələb olunmur** - Adi istifadəçi kimi işlədin
+
+---
+
+## 📋 Ümumi Baxış
+
+**Kerim's PDF Tools** PowerShell və Windows Forms ilə qurulmuş hərtərəfli, GUI əsaslı PDF manipulyasiya dəstidir. Ultra-sürətli PDF emalı üçün **QPDF**, **Ghostscript** və **PDFtk** istifadə edir.
+
+### Hansı Alətlərlə Qurulub
+
+| Alət | Məqsəd | Yerləşdiyi Yer |
+|------|--------|----------------|
+| **QPDF** | Ultra-sürətli PDF əməliyyatları | `LIBS\qpdf\` |
+| **PDFtk** | Ehtiyat PDF əməliyyatları | `LIBS\PDFtk Server\` |
+| **Ghostscript** | Sıxışdırma və önbaxış | `LIBS\gs\` |
+| **PowerShell** | GUI və məntiq | `LIBS\guipdf.ps1` |
+
+---
+
+## 🔧 Əsas Xüsusiyyətlər
+
+### 1. **PDF Birləşdirmə (Ultra-Sürətli)**
+- ⚡ **QPDF Mühərriki**: Yüzlərlə səhifəni millisaniyələr ərzində birləşdirir
+- 📂 **Çoxlu Daxiletmə Metodları**: Baxış, sürüşdür & burax, clipboard yapışdır
+- 🎨 **Önbaxış Sistemi**: İlk səhifənin kiçik şəkli
+- 📊 **Statistika**: Fayl sayı və ümumi ölçü izləmə
+- 📝 **İdxal/İxrac**: Toplu əməliyyatlar üçün TXT fayl siyahısı
+- 🔄 **Sıra Nəzarəti**: Yuxarı/Aşağı hərəkət et
+- 📁 **Ağıllı Sıxışdırma**: Birləşdirmədən sonra sıxışdırma (isteğe bağlı)
+
+### 2. **PDF Bölmə**
+- 🎯 **İki Bölmə Rejimi**:
+  - **Əl ilə Aralıq**: İstifadəçi səhifə aralıqları (məsələn, `1-3, 4-6, 7-10`)
+  - **Avtomatik Bölmə**: Hər N səhifədən bir avtomatik böl
+- 📊 **Ağıllı Deteksiya**: Səhifə sayını avtomatik müəyyən edir
+- 📂 **Toplu Emal**: Bütün PDF-i bir əməliyyatda böl
+- 🔄 **Proqres İzləmə**: Real vaxt status yeniləmələri
+- 📁 **Avtomatik Açma**: Çıxış qovluğunu avtomatik açır
+
+### 3. **PDF Şifrələmə (AES-256)**
+- 🛡️ **Hərbi Səviyyəli Təhlükəsizlik**: 256-bit AES şifrələmə
+- 🔑 **İki Səviyyəli Parol Sistemi**:
+  - **İstifadəçi Parolu**: Faylı açmaq üçün tələb olunur
+  - **Sahib Parolu**: İcazələri dəyişmək üçün tələb olunur
+- 📋 **İncə İcazə Nəzarəti**:
+  - Çap (Tam/Aşağı/Heç)
+  - Sənəd dəyişiklikləri
+  - Məzmun çıxarılması
+  - Əlçatanlıq xüsusiyyətləri
+  - Qeyd/şərh əlavə etmək
+  - Forma doldurma
+  - Sənəd montajı
+- 🔍 **Debug Konsolu**: Problemlərin aradan qaldırılması üçün ətraflı qeyd
+
+### 4. **Ağıllı PDF Sıxışdırma**
+- 🤖 **Süni İntellektə Bənzər Məzmun Analizi**:
+  - Mətn çıxarılması analizi
+  - Şəkil deteksiyası
+  - Qarışıq məzmun identifikasiyası
+  - Səhifə sayı deteksiyası
+  - Fayl ölçüsü analizi
+- 🎯 **6 Sıxışdırma Metodu**:
+
+| Metod | Ən Yaxşı Olduğu Sahə | Sıxışdırma Dərəcəsi |
+|-------|---------------------|-------------------|
+| **Ağıllı Avtomatik** | Bütün sənədlər | 50-90% |
+| **Şəkil Optimallaşdırılmış** | Şəkil ağırlıqlı PDF-lər | 60-80% |
+| **Şrift Alt Dəsti** | Mətn sənədləri | 90%+ |
+| **Balanslaşdırılmış** | Qarışıq məzmun | 40-70% |
+| **Mətndən Yenidən Qurma** | Zədələnmiş PDF-lər | Dəyişir |
+| **Maksimal + PDFtk Strip** | Maksimum sıxışdırma | 95%+ |
+
+---
+
+## 🎨 UI/UX Xüsusiyyətləri
+
+### **Müasir İnterfeys**
+- Rəng kodlu bölmələrlə təmiz, peşəkar dizayn
+- Asan naviqasiya üçün tablı interfeys
+- Real vaxt status yeniləmələri
+- Marquee proqres çubuğu ilə animasiyalı "İşləyir..." dialoqu
+- Peşəkar rəng sxemi (Mavilər, Yaşıllar, Bənövşəyilər, Narıncalar)
+
+### **Fayl İdarəetmə**
+- **Çoxlu daxiletmə metodları**:
+  - Fayl baxışı
+  - Qovluq baxışı (rekursiv PDF skan etmə)
+  - Sürüşdür & burax
+  - Clipboard yapışdır (Ctrl+V)
+  - **TXT fayl siyahılarının idxal/ixracı**
+  - Seçilmiş yolları kopyala (Ctrl+C)
+  - Sil düymələri
+
+### **Kontekst Menyu**
+- Faylları aç
+- Faylları/yolları yapışdır
+- Seçilmiş yolları kopyala
+- **TXT faylından siyahı idxal et**
+- **TXT faylına siyahı ixrac et**
+- Seçilmişləri sil
+- Hamısını təmizlə
+
+### **Önbaxış Sistemi**
+- İlk səhifənin kiçik şəkli
+- Ghostscript ilə render
+- Ekrana uyğunlaşdır
+- Status göstəriciləri
+
+---
+
+## 🛠️ Texniki Üstünlüklər
+
+### **Performans**
+- **Ultra-sürətli**: QPDF mühərriki böyük PDF-ləri millisaniyələr ərzində emal edir
+- **Çoxşaxəli**: Emal zamanı reaktiv UI
+- **Yaddaş səmərəli**: Faylları tamamilə yaddaşa yükləmədən emal edir
+- **Toplu emal**: Yüzlərlə faylı eyni anda emal et
+
+### **Etibarlılıq**
+- **Ehtiyat mexanizmləri**: QPDF → PDFtk ehtiyat birləşdirmə
+- **Xəta idarəetməsi**: Hərtərəfli try-catch blokları
+- **Debug konsolu**: Problemlərin aradan qaldırılması üçün ətraflı qeyd
+- **Validasiya**: Fayl mövcudluğu yoxlamaları, etibarlı PDF təsdiqi
+
+### **Uyğunluq**
+- **Çarpaz versiya dəstəyi**: PDF versiyaları 1.4 - 1.7
+- **Daxiletmə formatları**: Standart PDF, şifrələnmiş PDF-lər
+- **Çıxış formatları**: PDF, TXT (fayl siyahıları üçün)
+- **Unicode dəstəyi**: Tam beynəlxalq simvol dəstəyi
+
+### **Alət Deteksiyası**
+- **Rekursiv skan**: LIBS qovluğunda alətləri avtomatik tapır
+- **Çoxlu alət yolları**: Müxtəlif quraşdırma strukturlarını dəstəkləyir
+- **Ehtiyat deteksiya**: PATH mühit dəyişənində axtarış
+
+### **Təhlükəsizlik**
+- **AES-256 şifrələmə**: Dövlət səviyyəli təhlükəsizlik
+- **İcazə idarəetməsi**: İncə səviyyəli giriş nəzarəti
+- **Parol qorunması**: İkiqat parol sistemi
+- **Təhlükəsiz emal**: Müvəqqəti faylların təmizlənməsi
+
+---
+
+## 📊 İstifadəçi Təcrübəsi Üstünlükləri
+
+### **İstifadə Asanlığı**
+- **Bir klik əməliyyatları**: Birləşdir, böl, şifrələ, sıxışdır
+- **İntuitiv interfeys**: Aydın etiketləmə və təşkilatlanma
+- **Vizual geribildirim**: Status yeniləmələri və proqres göstəriciləri
+- **Klaviatura qısayolları**: Ctrl+V, Ctrl+C, Delete
+
+### **Məhsuldarlıq Artımı**
+- **Toplu əməliyyatlar**: Birdən çox faylı eyni anda emal et
+- **Qovluq skan etmə**: Qovluqdan bütün PDF-ləri avtomatik əlavə et
+- **TXT idxal/ixrac**: Sessiyalar arası fayl siyahılarını paylaş
+- **Avtomatik bölmə**: Bütün səhifələri bir kliklə böl
+
+### **Əlçatanlıq**
+- **Çoxdilli dəstək**: Dil faylı dəstəyi (.lang)
+- **Klaviatura naviqasiyası**: Tam klaviatura dəstəyi
+- **Aydın mesajlaşma**: Məlumatlandırıcı xəta və uğur mesajları
+- **Alət məsləhətləri**: Kontekstual yardım
+
+---
+
+## 💡 İnnovativ Xüsusiyyətlər
+
+### **Ağıllı Avtomatik Sıxışdırma**
+Alət optimal sıxışdırma metodunu müəyyən etmək üçün PDF məzmununu analiz edir:
+- **Yalnız mətn PDF-ləri**: Aqressiv şrift alt dəsti tətbiq edir
+- **Şəkil ağırlıqlı PDF-lər**: Keyfiyyətə uyğunlaşdırılmış şəkil sıxışdırması tətbiq edir
+- **Qarışıq məzmun**: Mətn və şəkil optimallaşdırmasını balanslaşdırır
+- **Skan edilmiş sənədlər**: Xüsusi şəkil sıxışdırması tətbiq edir
+
+### **İki Rejimli Bölmə**
+- **İstifadəçi aralıqları**: Səhifə çıxarılması üzərində tam nəzarət
+- **Avtomatik hissələrə bölmə**: Böyük PDF-ləri idarə olunan hissələrə böl
+
+### **İki Parollu Şifrələmə**
+- **İstifadəçi parolu**: Sənədə girişi idarə edir
+- **Sahib parolu**: Sənəd icazələrini idarə edir
+- **Çevik təhlükəsizlik**: Bir və ya hər iki paroldan istifadə edin
+
+---
+
+## 🚀 İstifadə Halları
+
+### **Peşəkarlar Üçün**
+- **Hüquq**: Eksponatları birləşdir, böyük sənədləri böl, həssas faylları şifrələ
+- **Nəşriyyat**: Yüksək keyfiyyətli PDF-ləri sıxışdır, səhifələri çıxar
+- **Təhsil**: Mühazirə materiallarını böl, tapşırıqları birləşdir
+- **Dövlət**: Sənədlərin təhlükəsiz şifrələnməsi, PDF emalı
+
+### **Şəxsi İstifadə Üçün**
+- **Foto albomlar**: Böyük şəkil PDF-lərini sıxışdır
+- **Elektron kitablar**: Kitabları fəsillərə böl
+- **Skan edilmiş sənədlər**: Optimallaşdır və təşkil et
+- **Təhlükəsiz paylaşım**: Şəxsi sənədləri parol ilə qoru
+
+---
+
+## 📈 Performans Göstəriciləri
+
+| Əməliyyat | Tipik Sürət | Texnologiya |
+|-----------|-------------|-------------|
+| 100 PDF-i birləşdir | < 1 saniyə | QPDF |
+| 500 səhifəlik PDF-i böl | 2-3 saniyə | QPDF |
+| AES-256 Şifrələmə | 5-10 saniyə | QPDF |
+| Sıxışdırma (Şəkil) | 15-30 saniyə | Ghostscript |
+| Sıxışdırma (Mətn) | 5-10 saniyə | Ghostscript |
+| Önbaxış yaratma | < 1 saniyə | Ghostscript |
+
+---
+
+## 🎯 Rəqabət Üstünlükləri
+
+### **Onlayn Xidmətlərə Qarşı**
+- ✅ Fayl ölçüsü məhdudiyyəti yoxdur
+- ✅ İnternet tələb olunmur
+- ✅ Limitsiz emal
+- ✅ Məxfilik narahatlığı yoxdur
+- ✅ Toplu emal
+- ✅ Çoxlu çıxış formatları
+- ✅ **Daha yaxşı sıxışdırma keyfiyyəti**
+
+### **Masaüstü Alternativlərə Qarşı**
+- ✅ Pulsuz və açıq mənbəli
+- ✅ Yüngül (ağır asılılıqlar yoxdur)
+- ✅ Quraşdırma tələb olunmur
+- ✅ Ultra-sürətli emal
+- ✅ Müəssisə səviyyəli şifrələmə
+- ✅ **Ödənişli alətlərdən daha səmərəli**
+
+---
+
+## 🔮 Gələcək Potensial
+
+### **Potensial Təkmilləşdirmələr**
+- **Toplu emal**: Ardıcıl olaraq çoxlu əməliyyatları emal et
+- **OCR inteqrasiyası**: Optik simvol tanıma əlavə et
+- **Bulud inteqrasiyası**: Birbaşa bulud yaddaş dəstəyi
+- **Su nişanı**: Mətn/şəkil su nişanları əlavə et
+- **Rəqəmsal imzalar**: PDF sənədlərini imzala
+- **Metadata redaktəsi**: PDF xassələrini dəyiş
+- **Forma çıxarılması**: Forma sahəsi məlumatlarını çıxar
+- **Səhifə fırlanması**: Toplu səhifə fırlanması
+
+---
+
+## 📋 Xülasə
+
+**Kerim's PDF Tools - QPDF ULTRA FAST V4** aşağıdakıları birləşdirən **peşəkar səviyyəli PDF manipulyasiya dəstidir**:
+
+- **Müəssisə performansı** QPDF-in ultra-sürətli mühərriki ilə
+- **Hərbi səviyyəli təhlükəsizlik** AES-256 şifrələmə ilə
+- **Peşəkar xüsusiyyətlər** ağıllı sıxışdırma və iki rejimli bölmə daxil olmaqla
+- **İstifadəçi dostu interfeys** müasir UI və intuitiv idarəetmə ilə
+- **Sıfır xərc** - tamamilə pulsuz və açıq mənbəli
+- **Məxfilik yönümlü** - tamamilə oflayn emal edir
+- **İstənilən onlayn xidmətdən daha yaxşı nəticələr**
+
+**Ən uyğundur**: Hüquq peşəkarları, nəşriyyatçılar, təhsil işçiləri, dövlət qurumları və bulud məxfilik narahatlığı olmadan sürətli, təhlükəsiz PDF emalına ehtiyacı olan hər kəs üçün.
+
+---
+
+## ⭐ Əsas Satış Nöqtələri
+
+1. **ULTRA SÜRƏTLİ**: Dəqiqələr yox, millisaniyələr ərzində birləşdirir
+2. **100% PULSUZ**: Gizli xərclər yoxdur, abunəlik yoxdur
+3. **OFFLAYIN**: Həssas sənədləri təhlükəsiz emal et
+4. **AES-256**: Hərbi səviyyəli şifrələmə
+5. **AĞILLI SIXIŞDIRMA**: Süni intellektə bənzər məzmun analizi
+6. **QURAŞDIRMA TƏLƏB OLUNMUR**: Portativ icra olunan fayl
+7. **TOPLU EMAL**: Yüzlərlə faylı idarə et
+8. **PEŞƏKAR UI**: Təmiz, müasir interfeys
+9. **ONLAYN XİDMƏTLƏRDƏN DAHA YAXŞI**: Üstün sıxışdırma keyfiyyəti
+10. **WINDOWS 10/11**: Tam test edilib və optimallaşdırılıb
+
+---
+
+## 📦 Yükləmə
+
+### Son Buraxılış
+[![Download](https://img.shields.io/badge/Yüklə-Son_Buraxılış-blue.svg)](https://github.com/yourusername/kerim-pdf-tools/releases/latest)
+
+### Quraşdırma Addımları
+1. Arxivi [Releases](https://github.com/yourusername/kerim-pdf-tools/releases) bölməsindən yükləyin
+2. İstənilən qovluğa açın (tövsiyə: İş masası)
+3. `Start.bat` faylını işə salın
+4. GUI açılacaq - istifadəyə hazırdır!
+
+---
+
+## 📄 Lisenziya
+
+Bu layihə MIT Lisenziyası altında lisenziyalaşdırılıb - ətraflı məlumat üçün [LICENSE](LICENSE) faylına baxın.
+
+---
+
+## 🙏 Təşəkkürlər
+
+### İstifadə Olunan Rəsmi İkili Fayllar
+- **QPDF** - Əsas PDF emal mühərriki (`LIBS\qpdf\`)
+- **Ghostscript** - PDF sıxışdırma və önbaxış yaratma (`LIBS\gs\`)
+- **PDFtk** - Ehtiyat PDF əməliyyatları (`LIBS\PDFtk Server\`)
+
+### GUI Texnologiyası
+- **PowerShell** - GUI və məntiq (`LIBS\guipdf.ps1`)
+
+### Təşəkkürlər
+- **Tural** - Yaradıcı və baş inkişaf etdirici
+- **Kerim** - İlham və həsr
+
+---
+
+**❤️ ilə PDF cəmiyyəti üçün hazırlanıb**
+
+*"PDF-ləri düşüncə sürətində emal edir"* ⚡
+
+---
+
+*Windows 10, Windows 11-də test edilib*
+
+**Tam Dəyişikliklər Siyahısı**: https://github.com/Kerim4ik4/PDF-Compress-and-Merge/compare/v3...v4
+
 *Tested on Windows 10, Windows 11*
 
 **Full Changelog**: https://github.com/Kerim4ik4/PDF-Compress-and-Merge/compare/v3...v4
